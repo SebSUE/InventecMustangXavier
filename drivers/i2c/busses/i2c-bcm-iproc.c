@@ -76,7 +76,7 @@
 #define M_RX_DATA_SHIFT              0
 #define M_RX_DATA_MASK               0xff
 
-#define I2C_TIMEOUT_MESC             100
+#define I2C_TIMEOUT_MSEC             100
 #define M_TX_RX_FIFO_SIZE            64
 
 enum bus_speed_index {
@@ -210,7 +210,7 @@ static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
 	int ret, i;
 	u8 addr;  
 	u32 val;
-	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
+	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MSEC);
 
 /*
 	printk("[ADK]\t\t%s I2C-%x: %s(%d)", __func__, msg->addr, ((msg->flags & I2C_M_RD)? "read" : "write"), msg->len);
