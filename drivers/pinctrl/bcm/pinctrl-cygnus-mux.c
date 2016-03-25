@@ -338,6 +338,9 @@ static struct cygnus_pin cygnus_pins[] = {
 	CYGNUS_PIN_DESC(177, "gpio1_3p3", 0, 0, 0),
 	CYGNUS_PIN_DESC(178, "gpio2_3p3", 0, 0, 0),
 	CYGNUS_PIN_DESC(179, "gpio3_3p3", 0, 0, 0),
+	CYGNUS_PIN_DESC(180, "gpio4_3p3", 0, 0, 0),
+	CYGNUS_PIN_DESC(181, "gpio5_3p3", 0, 0, 0),
+	CYGNUS_PIN_DESC(182, "gpio6_3p3", 0, 0, 0),
 };
 
 /*
@@ -768,6 +771,20 @@ static int cygnus_get_function_groups(struct pinctrl_dev *pctrl_dev,
 	return 0;
 }
 
+static struct cygnus_pinctrl *d_pinctrl = NULL;
+
+void cygnus_pinmux_raw_dump(void) 
+{
+	int idx;
+	
+	if (!d_pinctrl) return;
+	
+	for (idx=0; idx < CYGNUS_NUM_IOMUX_REGS; idx++)
+		printk("[ADK]\tCRMU_IOMUX_CTRL%d: 0x%08x\n", idx, readl(d_pinctrl->base0 + idx*4));
+	for (idx=0; idx < CYGNUS_NUM_IOMUX_REGS; idx++)
+		printk("[ADK]\tCRMU_IOMUX_CTRL%d: 0x%08x\n", idx+8, readl(d_pinctrl->base1 + idx*4));
+}
+
 static int cygnus_pinmux_set(struct cygnus_pinctrl *pinctrl,
 			     const struct cygnus_pin_function *func,
 			     const struct cygnus_pin_group *grp,
@@ -777,6 +794,8 @@ static int cygnus_pinmux_set(struct cygnus_pinctrl *pinctrl,
 	int i;
 	u32 val, mask = 0x7;
 	unsigned long flags;
+
+printk("[ADK] %s entered\n", __func__);
 
 	for (i = 0; i < CYGNUS_NUM_IOMUX; i++) {
 		if (mux->offset != mux_log[i].mux.offset ||
@@ -945,7 +964,10 @@ static int cygnus_pinmux_probe(struct platform_device *pdev)
 	pinctrl = devm_kzalloc(&pdev->dev, sizeof(*pinctrl), GFP_KERNEL);
 	if (!pinctrl)
 		return -ENOMEM;
-
+	
+// [ADK] for debuuging
+	d_pinctrl = pinctrl;
+	
 	pinctrl->dev = &pdev->dev;
 	platform_set_drvdata(pdev, pinctrl);
 	spin_lock_init(&pinctrl->lock);

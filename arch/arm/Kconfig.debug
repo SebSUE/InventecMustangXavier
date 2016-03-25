@@ -186,6 +186,14 @@ choice
 		  If you have a Broadcom STB chip and would like early print
 		  messages to appear over the UART, select this option.
 
+	config DEBUG_BCM_IPROC_UART3
+		bool "Kernel low-level debugging on BCM IPROC UART3"
+		depends on ARCH_BCM_CYGNUS
+		help
+		  Say Y here if you want the debug print routines to direct
+		  their output to the third serial port on these devices.
+
+
 	config DEBUG_CLPS711X_UART1
 		bool "Kernel low-level debugging messages via UART1"
 		depends on ARCH_CLPS711X
@@ -1305,6 +1313,8 @@ config DEBUG_LL_INCLUDE
 	string
 	default "debug/sa1100.S" if DEBUG_SA1100
 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+	default "debug/bcm_iproc.S" if DEBUG_BCM_IPROC_UART1 || \
+				DEBUG_BCM_IPROC_UART3
 	default "debug/at91.S" if DEBUG_AT91_UART
 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
@@ -1651,4 +1661,4 @@ config DEBUG_SET_MODULE_RONX
 
 source "drivers/hwtracing/coresight/Kconfig"
 
-endmenu
+	endmenu

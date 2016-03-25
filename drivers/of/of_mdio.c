@@ -35,6 +35,7 @@ static int of_get_phy_id(struct device_node *device, u32 *phy_id)
 	of_property_for_each_string(device, "compatible", prop, cp) {
 		if (sscanf(cp, "ethernet-phy-id%4x.%4x", &upper, &lower) == 2) {
 			*phy_id = ((upper & 0xFFFF) << 16) | (lower & 0xFFFF);
+printk("[ADK]\t\t%s: phy_id=0x%08x\n", __func__, *phy_id);			
 			return 0;
 		}
 	}
@@ -88,6 +89,7 @@ static int of_mdiobus_register_phy(struct mii_bus *mdio, struct device_node *chi
 
 	dev_dbg(&mdio->dev, "registered phy %s at address %i\n",
 		child->name, addr);
+printk("[ADK]\t%s: registered phy %s at address %i\n", __func__, child->name, addr);			
 
 	return 0;
 }
@@ -152,6 +154,7 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
 			scanphys = true;
 			continue;
 		}
+printk("[ADK]\t%s: addr=0x%x\n", __func__, addr);		
 
 		rc = of_mdiobus_register_phy(mdio, child, addr);
 		if (rc)
@@ -160,6 +163,8 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
 
 	if (!scanphys)
 		return 0;
+
+printk("[ADK]\t%s/%d\n", __func__, __LINE__);		
 
 	/* auto scan for PHYs with empty reg property */
 	for_each_available_child_of_node(np, child) {

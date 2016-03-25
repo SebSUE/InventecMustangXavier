@@ -131,6 +131,9 @@ static inline void cygnus_set_bit(struct cygnus_gpio *chip, unsigned int reg,
 	else
 		val &= ~BIT(shift);
 	writel(val, chip->base + offset);
+	
+printk("[ADK]\t\t%s read_back@%p: 0x%08x\n", __func__, (void *)(chip->base + offset), readl(chip->base + offset));
+	
 }
 
 static inline bool cygnus_get_bit(struct cygnus_gpio *chip, unsigned int reg,
@@ -293,6 +296,8 @@ static int cygnus_gpio_request(struct gpio_chip *gc, unsigned offset)
 	struct cygnus_gpio *chip = to_cygnus_gpio(gc);
 	unsigned gpio = gc->base + offset;
 
+printk("[ADK]\t%s: offset=%d --> gpio=%d\n", __func__, offset, gpio);
+
 	/* not all Cygnus GPIO pins can be muxed individually */
 	if (!chip->pinmux_is_supported)
 		return 0;
@@ -337,7 +342,9 @@ static int cygnus_gpio_direction_output(struct gpio_chip *gc, unsigned gpio,
 	spin_unlock_irqrestore(&chip->lock, flags);
 
 	dev_dbg(chip->dev, "gpio:%u set output, value:%d\n", gpio, val);
-
+printk("[ADK]\t%s gpio:%u (base=%p) set output, value:%d@bit %d\n", __func__,  gpio, 
+	(void *)(chip->base + CYGNUS_GPIO_REG(gpio, CYGNUS_GPIO_DATA_OUT_OFFSET)), val, CYGNUS_GPIO_SHIFT(gpio));
+	
 	return 0;
 }
 
@@ -351,6 +358,8 @@ static void cygnus_gpio_set(struct gpio_chip *gc, unsigned gpio, int val)
 	spin_unlock_irqrestore(&chip->lock, flags);
 
 	dev_dbg(chip->dev, "gpio:%u set, value:%d\n", gpio, val);
+printk("[ADK]\t%s gpio:%u (base=%p) set output, value:%d@bit %d\n", __func__,  gpio, 
+	(void *)(chip->base + CYGNUS_GPIO_REG(gpio, CYGNUS_GPIO_DATA_OUT_OFFSET)), val, CYGNUS_GPIO_SHIFT(gpio));
 }
 
 static int cygnus_gpio_get(struct gpio_chip *gc, unsigned gpio)

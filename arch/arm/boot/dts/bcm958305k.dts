@@ -41,15 +41,120 @@
 
 	aliases {
 		serial0 = &uart3;
+		serial1 = &uart0;
 	};
 
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
+
+	sound {
+/*		compatible = "bcm,cygnussvk-machine";     */
+		compatible = "bcm,cygnus-hoka-machine";
+		bcm,cygnus-pcm = <&cygnus_audio>;
+
+/* -----------------------------------------------*/
+		bcm,cygnus-link0-ssp = "cygnus-ssp0";
+		bcm,cygnus-link0-mode = "tdm";
+		bcm,cygnus-link0-slave = <1>;
+		bcm,cygnus-link0-frame-width = <128>;
+		bcm,cygnus-link1-slave = <0>;
+		bcm,cygnus-link1-ssp = "cygnus-ssp1";
+		bcm,cygnus-link2-slave = <0>;
+		bcm,cygnus-link2-ssp = "cygnus-ssp1";
+		bcm,cygnus-link3-slave = <0>;
+		bcm,cygnus-link3-ssp = "cygnus-ssp1";
+/* ---------------------------------------------- */
+/* -----------------------------------------------
+		bcm,cygnus-link0-codec = <&tlv320aic34_1A>;     
+		bcm,cygnus-link0-ssp = "cygnus-ssp0";
+		bcm,cygnus-link0-mode = "tdm";
+		bcm,cygnus-link0-slave = <1>;
+		bcm,cygnus-link0-frame-width = <128>;
+
+		bcm,cygnus-link1-codec = <&tlv320aic34_1B>;
+		bcm,cygnus-link1-ssp = "cygnus-ssp0";
+		bcm,cygnus-link1-mode = "tdm";
+		bcm,cygnus-link1-slave = <1>;
+		bcm,cygnus-link1-frame-width = <128>;
+
+		bcm,cygnus-link2-codec = <&tlv320aic34_2A>;
+		bcm,cygnus-link2-ssp = "cygnus-ssp0";
+		bcm,cygnus-link2-mode = "tdm";
+		bcm,cygnus-link2-slave = <1>;
+		bcm,cygnus-link2-frame-width = <128>;
+
+
+		bcm,cygnus-link3-codec = <&tlv320aic34_2B>;
+		bcm,cygnus-link3-ssp = "cygnus-ssp0";
+		bcm,cygnus-link3-mode = "tdm";
+		bcm,cygnus-link3-slave = <1>;
+		bcm,cygnus-link3-frame-width = <128>;
+---------------------------------------------- */
+		status = "okay";
+
+	};
 };
 
 &i2c0 {
+	clock-frequency = <100000>;
 	status = "okay";
+	tlv320aic34_1A: tlv320aic33@18 {
+		compatible = "ti,tlv320aic33";
+		reg = <0x18>;
+/* -- Set a minimal for now
+		gpio-reset = <&gpio_asiu 126 0>;
+			ai3x-micbias-vg = <2>;
+-------- */			
+		ai3x-gpio-func = <
+				2 /* AIC3X_GPIO1_FUNC_CLOCK_MUX  */
+				0 /* AIC3X_GPIO2_FUNC_DISABLED */
+			>;
+		status = "okay";
+
+	};
+	tlv320aic34_1B: tlv320aic33@19 {
+		compatible = "ti,tlv320aic33";
+		reg = <0x19>;
+/* -- Set a minimal for now
+		gpio-reset = <&gpio_asiu 126 0>;
+			ai3x-micbias-vg = <2>;
+-------- */			
+		ai3x-gpio-func = <
+				0 /* AIC3X_GPIO1_FUNC_DISABLED  */
+				0 /* AIC3X_GPIO2_FUNC_DISABLED */
+			>;
+		status = "okay";
+
+	};
+	tlv320aic34_2A: tlv320aic33@1a {
+		compatible = "ti,tlv320aic33";
+		reg = <0x1a>;
+/* -- Set a minimal for now
+		gpio-reset = <&gpio_asiu 126 0>;
+			ai3x-micbias-vg = <2>;
+-------- */			
+		ai3x-gpio-func = <
+				0 /* AIC3X_GPIO1_FUNC_DISABLED  */
+				0 /* AIC3X_GPIO2_FUNC_DISABLED */
+			>;
+		status = "okay";
+
+	};
+	tlv320aic34_2B: tlv320aic33@1b {
+		compatible = "ti,tlv320aic33";
+		reg = <0x1b>;
+/* -- Set a minimal for now
+		gpio-reset = <&gpio_asiu 126 0>;
+			ai3x-micbias-vg = <2>;
+-------- */			
+		ai3x-gpio-func = <
+				0 /* AIC3X_GPIO1_FUNC_DISABLED  */
+				0 /* AIC3X_GPIO2_FUNC_DISABLED */
+			>;
+		status = "okay";
+
+	};
 };
 
 &i2c1 {
@@ -61,6 +166,10 @@
 };
 
 &pcie1 {
+	status = "okay";
+};
+
+&uart0 {
 	status = "okay";
 };
 
@@ -82,4 +191,13 @@
 
 		brcm,nand-oob-sector-size = <27>;
 	};
+
 };
+
+&ehci0 {
+		phys = <&usbphy0 0 1 &usbphy0 2 1>;
+		phy-names = "usbp0", "usbp2";
+		status = "okay";
+};
+
+

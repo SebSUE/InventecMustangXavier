@@ -25,6 +25,12 @@
 #define PLL_VCO_HIGH_SHIFT 19
 #define PLL_VCO_LOW_SHIFT  30
 
+/*
+ * PLL MACRO_SELECT modes 0 to 5 choose pre-calculated PLL output frequencies
+ * from a look-up table. Mode 7 allows user to manipulate PLL clock dividers
+ */
+#define PLL_USER_MODE 7
+
 /* number of delay loops waiting for PLL to lock */
 #define LOCK_DELAY 100
 
@@ -127,11 +133,15 @@ static int pll_wait_for_lock(struct iproc_pll *pll)
 	int i;
 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
 
+printk("[ADK] %s entered\n", __func__);
+
 	for (i = 0; i < LOCK_DELAY; i++) {
 		u32 val = readl(pll->status_base + ctrl->status.offset);
 
-		if (val & (1 << ctrl->status.shift))
+		if (val & (1 << ctrl->status.shift)) {
+printk("[ADK] %s LOCK!\n", __func__);
 			return 0;
+		}
 		udelay(10);
 	}
 
@@ -142,6 +152,8 @@ static void iproc_pll_write(const struct iproc_pll *pll, void __iomem *base,
 			    const u32 offset, u32 val)
 {
 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
+
+printk("[ADK]\t%s entered offset=0x%x, val=0x%08x\n", __func__, offset, val);
 
 	writel(val, base + offset);
 
@@ -154,6 +166,8 @@ static void __pll_disable(struct iproc_pll *pll)
 {
 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
 	u32 val;
+
+printk("[ADK] %s entered\n", __func__);
 
 	if (ctrl->flags & IPROC_CLK_PLL_ASIU) {
 		val = readl(pll->asiu_base + ctrl->asiu.offset);
@@ -184,6 +198,8 @@ static int __pll_enable(struct iproc_pll *pll)
 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
 	u32 val;
 
+printk("[ADK] %s entered\n", __func__);
+
 	if (ctrl->flags & IPROC_CLK_EMBED_PWRCTRL) {
 		val = readl(pll->control_base + ctrl->aon.offset);
 		val &= ~(bit_mask(ctrl->aon.pwr_width) << ctrl->aon.pwr_shift);
@@ -202,6 +218,7 @@ static int __pll_enable(struct iproc_pll *pll)
 	if (ctrl->flags & IPROC_CLK_PLL_ASIU) {
 		val = readl(pll->asiu_base + ctrl->asiu.offset);
 		val |= (1 << ctrl->asiu.en_shift);
+printk("[ADK] %s: set ASIU offset=0x%x val=0x%08x\n", __func__, ctrl->asiu.offset, val);		
 		iproc_pll_write(pll, pll->asiu_base, ctrl->asiu.offset, val);
 	}
 
@@ -214,8 +231,13 @@ static void __pll_put_in_reset(struct iproc_pll *pll)
 	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
 
+printk("[ADK] %s entered\n", __func__);
+
 	val = readl(pll->control_base + reset->offset);
-	val &= ~(1 << reset->reset_shift | 1 << reset->p_reset_shift);
+	if (ctrl->flags & IPROC_CLK_PLL_RESET_ACTIVE_LOW)
+		val |= BIT(reset->reset_shift) | BIT(reset->p_reset_shift);
+	else
+		val &= ~(BIT(reset->reset_shift) | BIT(reset->p_reset_shift));
 	iproc_pll_write(pll, pll->control_base, reset->offset, val);
 }
 
@@ -227,6 +249,8 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
 	const struct iproc_pll_reset_ctrl *reset = &ctrl->reset;
 	const struct iproc_pll_dig_filter_ctrl *dig_filter = &ctrl->dig_filter;
 
+printk("[ADK] %s entered\n", __func__);
+
 	val = readl(pll->control_base + dig_filter->offset);
 	val &= ~(bit_mask(dig_filter->ki_width) << dig_filter->ki_shift |
 		bit_mask(dig_filter->kp_width) << dig_filter->kp_shift |
@@ -236,7 +260,10 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
 	iproc_pll_write(pll, pll->control_base, dig_filter->offset, val);
 
 	val = readl(pll->control_base + reset->offset);
-	val |= 1 << reset->reset_shift | 1 << reset->p_reset_shift;
+	if (ctrl->flags & IPROC_CLK_PLL_RESET_ACTIVE_LOW)
+		val &= ~(BIT(reset->reset_shift) | BIT(reset->p_reset_shift));
+	else
+		val |= BIT(reset->reset_shift) | BIT(reset->p_reset_shift);
 	iproc_pll_write(pll, pll->control_base, reset->offset, val);
 }
 
@@ -251,6 +278,8 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
 	u32 val;
 	enum kp_band kp_index;
 	unsigned long ref_freq;
+
+printk("[ADK] %s entered, [%s] rate=%ld (%d), parent_rate=%ld\n", __func__, clk->name, rate, rate_index, parent_rate);
 
 	/*
 	 * reference frequency = parent frequency / PDIV
@@ -291,6 +320,16 @@ static int pll_set_rate(struct iproc_clk *clk, unsigned int rate_index,
 
 	/* put PLL in reset */
 	__pll_put_in_reset(pll);
+
+	/* set PLL in user mode before modifying PLL controls */
+	if (ctrl->flags & IPROC_CLK_PLL_USER_MODE_ON) {
+		val = readl(pll->control_base + ctrl->macro_mode.offset);
+		val &= ~(bit_mask(ctrl->macro_mode.width) <<
+			ctrl->macro_mode.shift);
+		val |= PLL_USER_MODE << ctrl->macro_mode.shift;
+		iproc_pll_write(pll, pll->control_base,
+			ctrl->macro_mode.offset, val);
+	}
 
 	iproc_pll_write(pll, pll->control_base, ctrl->vco_ctrl.u_offset, 0);
 
@@ -437,9 +476,13 @@ static int iproc_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	struct iproc_pll *pll = clk->pll;
 	int rate_index, ret;
 
+printk("[ADK] %s entered, rate=%ld, parent_rate=%ld\n", __func__, rate, parent_rate);
+
 	rate_index = pll_get_rate_index(pll, rate);
 	if (rate_index < 0)
 		return rate_index;
+
+printk("[ADK] %s rate_index=%d\n", __func__, rate_index);
 
 	ret = pll_set_rate(clk, rate_index, parent_rate);
 	return ret;
@@ -505,7 +548,10 @@ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
 	if (mdiv == 0)
 		mdiv = 256;
 
-	clk->rate = parent_rate / mdiv;
+	if (ctrl->flags & IPROC_CLK_MCLK_DIV_BY_2)
+		clk->rate = parent_rate / (mdiv * 2);
+	else
+		clk->rate = parent_rate / mdiv;
 
 	return clk->rate;
 }
@@ -531,6 +577,7 @@ static long iproc_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 	return *parent_rate / div;
 }
 
+
 static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 		unsigned long parent_rate)
 {
@@ -540,10 +587,20 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	u32 val;
 	unsigned int div;
 
+printk("[ADK] %s entered, rate=%ld, parent_rate=%ld\n", __func__, rate, parent_rate);
+/* [ADK]
+if (!strcmp(clk->name, "ch0_audio")) {
+	printk("[ADK] %s it ch0 clock, out for debugging ..\n", __func__);
+	return 0;
+}
+*/	
 	if (rate == 0 || parent_rate == 0)
 		return -EINVAL;
 
-	div = DIV_ROUND_UP(parent_rate, rate);
+	if (ctrl->flags & IPROC_CLK_MCLK_DIV_BY_2)
+		div = DIV_ROUND_UP(parent_rate, rate * 2);
+	else
+		div = DIV_ROUND_UP(parent_rate, rate);
 	if (div > 256)
 		return -EINVAL;
 
@@ -555,7 +612,12 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 		val |= div << ctrl->mdiv.shift;
 	}
 	iproc_pll_write(pll, pll->control_base, ctrl->mdiv.offset, val);
-	clk->rate = parent_rate / div;
+	if (ctrl->flags & IPROC_CLK_MCLK_DIV_BY_2)
+		clk->rate = parent_rate / (div * 2);
+	else
+		clk->rate = parent_rate / div;
+	
+printk("[ADK] %s [%s] set rate=%ld \n", __func__, clk->name, clk->rate);
 
 	return 0;
 }

@@ -95,7 +95,23 @@
 			compatible = "brcm,cygnus-pinmux";
 			reg = <0x0301d0c8 0x30>,
 			      <0x0301d24c 0x2c>;
+			i2s_0: i2s_0 {
+				function = "i2s0";
+				groups = "i2s0_0_grp", "i2s0_1_grp";
+			};
+
+			i2s_1: i2s_1 {
+				function = "i2s1";
+				groups = "i2s1_0_grp", "i2s1_1_grp";
+			};
+
+			i2s_2: i2s_2 {
+				function = "i2s2";
+				groups = "i2s2_0_grp", "i2s2_1_grp", "i2s2_2_grp",
+				 	"i2s2_3_grp", "i2s2_4_grp";
+			};
 		};
+
 
 		gpio_crmu: gpio@03024800 {
 			compatible = "brcm,cygnus-crmu-gpio";
@@ -105,6 +121,21 @@
 			gpio-controller;
 		};
 
+/* -------------------------
+		gpio_asiu: gpio@180a5000 {
+			compatible = "brcm,cygnus-gpio";
+			reg = <0x180a5000 0x668>;
+			ngpios = <146>;
+			linux,gpio-base = <24>;
+			#gpio-cells = <2>;
+			gpio-controller;
+
+			pinmux = <&pinctrl>;	
+
+			interrupt-controller;
+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+		};
+------------------- */
 		i2c0: i2c@18008000 {
 			compatible = "brcm,cygnus-iproc-i2c", "brcm,iproc-i2c";
 			reg = <0x18008000 0x100>;
@@ -262,5 +293,146 @@
 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
+/* ------------- [ADK] --------------------*/
+		mdio: mdio@18002000 {
+			compatible = "brcm,iproc-mdio";
+			reg = <0x18002000 0x8>;
+			#size-cells = <1>;
+			#address-cells = <0>;
+
+				phy0: enet_gphy0@0 {
+					compatible = "ethernet-phy-idae02.5200";
+					reg = <0>;
+			};
+				phy1: enet_gphy1@1 {
+					compatible = "ethernet-phy-idae02.5200";
+					reg = <1>;
+			};
+		};
+
+		enet: enet@0x18042000 {
+			compatible = "brcm,amac-enet";
+			reg = <0x18042000 0x1000>,
+		      		<0x18110408 0x10>,
+		      		<0x18110800 0x4>,
+		      		<0x18000000 0x1000>,
+		      		<0x0301d194 0x4>,
+		      		<0x0301d0bc 0x4>,
+		      		<0x18007000 0x1000>;
+			reg-names = "core_base",
+				"amac_io_ctrl",
+				"amac_idm_reset",
+				"icfg",
+				"switch_global_base",
+				"crmu_io_pad_ctrl",
+				"srab_base";
+			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+			switchmode = <1>;
+			status="okay";
+			phy-handle = <&phy0>;
+
+			port@0 {
+				port-id = <0>;
+				port-type = <0>;
+				phy-id = <0>;
+			};
+
+			port@1 {
+				port-id = <1>;
+				port-type = <1>;
+				phy-id = <1>;
+			};
+		};
+
+		extcon_usb: extcon_usb@0 {
+			compatible = "brcm,extcon_cygnus_usb";
+			vbus-gpio = <&gpio_asiu 121 0>;
+			id-gpio = <&gpio_asiu 122 0>;
+			enable-gpio = <&gpio_ccm 7 0>;   
+			enable-active-high;
+			status = "okay";
+		};
+
+		usbphy0: usbphy@0x0301c000 {
+			#phy-cells = <2>;
+			num-phys = <3>;
+			compatible = "brcm,cygnus-usb-phy";
+			reg = <0x0301c000 0x2000>,
+		      		<0x18115000 0x1000>,
+		      		<0x18111000 0x1000>;
+			enable-dual-role;
+			extcon = <&extcon_usb>;
+			status = "okay";
+		};
+
+		ehci0: usb@0x18048000 {
+			compatible = "generic-ehci";
+			reg = <0x18048000 0x100>;
+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
+
+		cygnus_audio: audio@180ae000 {
+			compatible = "brcm,cygnus-audio";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <0x180ae000 0x1000>;
+/* --------------------------------------
+			reg = <0x180ae000 0xafd>, <0x180aec00 0x1f8>;
+			reg-names = "aud", "i2s_in";
+----------- */	
+			clocks = <&audiopll BCM_CYGNUS_AUDIOPLL_CH0>,
+					<&audiopll BCM_CYGNUS_AUDIOPLL_CH1>,
+					<&audiopll BCM_CYGNUS_AUDIOPLL_CH2>;
+
+			clock-names = "ch0_audio", "ch1_audio", "ch2_audio";
+
+			interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+			status = "okay";
+
+			ssp0: ssp_port@0 {
+				reg = <0>;
+				channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
+				status = "okay";
+			};
+
+			ssp1: ssp_port@1 {
+				reg = <1>;
+				channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
+				status = "okay";
+			};
+
+			ssp2: ssp_port@2 {
+				reg = <2>;
+				status = "disabled";
+			};
+		};
+
+		dma0: dma@18018000 {
+			compatible = "arm,pl330", "arm,primecell";
+			reg = <0x18018000 0x1000>;
+			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&apb_clk>;
+			clock-names = "apb_pclk";
+			#dma-cells = <1>;
+		};
+
+	bluetooth {
+		compatible = "brcm,bcmbt-rfkill";
+		num-rf-regs = <3>;
+		bt-dev-wake-gpio = <&gpio_crmu 3 0>;
+		bt-host-wake-gpio = <&gpio_crmu 5 0>;
+	};
+		
+/*----------------------------------------*/
 	};
 };

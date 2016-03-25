@@ -117,4 +117,14 @@ config EXTCON_USB_GPIO
 	  Say Y here to enable GPIO based USB cable detection extcon support.
 	  Used typically if GPIO is used for USB ID pin detection.
 
+config EXTCON_CYGNUS
+	tristate "Cygnus EXTCON support"
+	depends on  ARCH_BCM_CYGNUS || COMPILE_TEST
+	default ARCH_BCM_CYGNUS
+	help
+	  Say Y here to enable support for external accessory detection
+	  with Cygnus devices. This is a USB port accessory detector, and
+	  detects host and device mode connection. 
+
+
 endif

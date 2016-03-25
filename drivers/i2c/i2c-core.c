@@ -2731,6 +2731,8 @@ s32 i2c_smbus_write_word_data(const struct i2c_client *client, u8 command,
 {
 	union i2c_smbus_data data;
 	data.word = value;
+printk("[ADK] %s entered\n", __func__);
+
 	return i2c_smbus_xfer(client->adapter, client->addr, client->flags,
 			      I2C_SMBUS_WRITE, command,
 			      I2C_SMBUS_WORD_DATA, &data);
@@ -3036,6 +3038,8 @@ s32 i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr, unsigned short flags,
 			 command, protocol);
 
 	flags &= I2C_M_TEN | I2C_CLIENT_PEC | I2C_CLIENT_SCCB;
+
+printk("[ADK] %s entered real=%p\n", __func__, (void *)adapter->algo->smbus_xfer);
 
 	if (adapter->algo->smbus_xfer) {
 		i2c_lock_adapter(adapter);

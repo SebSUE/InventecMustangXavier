@@ -508,6 +508,8 @@ struct phy_device *phy_connect(struct net_device *dev, const char *bus_id,
 	struct device *d;
 	int rc;
 
+printk("[ADK]\t%s entered, bus_id=[%s]\n", __func__, bus_id);
+
 	/* Search the list of PHY devices on the mdio bus for the
 	 * PHY with the requested name
 	 */

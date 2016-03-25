@@ -80,6 +80,9 @@ static int bcm_cygnus_config_init(struct phy_device *phydev)
 {
 	int reg, rc;
 
+	printk("[ADK] %s Enter\n", __func__);
+
+
 	reg = phy_read(phydev, MII_BCM54XX_ECR);
 	if (reg < 0)
 		return reg;
@@ -107,6 +110,8 @@ static int bcm_cygnus_config_init(struct phy_device *phydev)
 	rc = bcm_phy_enable_eee(phydev);
 	if (rc)
 		return rc;
+
+	printk("[ADK] %s Enable APD ..\n", __func__);
 
 	/* Enable APD */
 	return bcm_phy_enable_apd(phydev, false);

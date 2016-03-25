@@ -3298,6 +3298,9 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
 	int i, j;
 	int val;
 
+printk("[ADK] %s entered\n", __func__);
+//dump_stack();
+
 	/* Try ONFI for unknown chip or LP */
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x20, -1);
 	if (chip->read_byte(mtd) != 'O' || chip->read_byte(mtd) != 'N' ||
@@ -3306,10 +3309,22 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
 
 	chip->cmdfunc(mtd, NAND_CMD_PARAM, 0, -1);
 	for (i = 0; i < 3; i++) {
+//printk("[ADK] %s: read ONFI params, %d bytes\n", __func__, sizeof(*p));
+
+/*ADK  01/19/2016  read ONFI params changed .. */
 		for (j = 0; j < sizeof(*p); j++)
 			((uint8_t *)p)[j] = chip->read_byte(mtd);
+		
+
+/*
+print_hex_dump(KERN_CONT, "", DUMP_PREFIX_OFFSET,
+			16, 1,
+			p, sizeof(*p), false);
+*/
+
 		if (onfi_crc16(ONFI_CRC_BASE, (uint8_t *)p, 254) ==
 				le16_to_cpu(p->crc)) {
+			printk("[ADK] %s: ONFI param page %d valid\n", __func__, i);
 			break;
 		}
 	}
@@ -3826,6 +3841,11 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	if (!type)
 		type = nand_flash_ids;
 
+printk("[ADK] %s NAND id=[%02x %02x %02x %02x %02x %02x %02x %02x]\n", __func__,
+	id_data[0], id_data[1], id_data[2], id_data[3], id_data[4], id_data[5], id_data[6], id_data[7]
+	);
+
+
 	for (; type->name != NULL; type++) {
 		if (is_full_id_nand(type)) {
 			if (find_full_id_nand(mtd, chip, type, id_data, &busw))
@@ -3835,6 +3855,9 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 		}
 	}
 
+if (type->name) {
+	printk("[ADK] %s NAND: name=[%s], pagezise=%d\n", __func__, type->name, type->pagesize);
+}
 	chip->onfi_version = 0;
 	if (!type->name || !type->pagesize) {
 		/* Check if the chip is ONFI compliant */

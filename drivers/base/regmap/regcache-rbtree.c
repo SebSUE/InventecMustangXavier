@@ -389,6 +389,8 @@ static int regcache_rbtree_write(struct regmap *map, unsigned int reg,
 	unsigned int reg_tmp;
 	int ret;
 
+// printk("[ADK] %s eneterd\n", __func__);
+
 	rbtree_ctx = map->cache;
 
 	/* if we can't locate it in the cached rbnode we'll have

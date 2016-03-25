@@ -20,10 +20,17 @@
 struct platform_device;
 struct dev_pm_ops;
 
+#define NAND_ECC_MIPS_UNCORR_REG		0x18
+#define NAND_ECC_MIPS_CORR_REG		0x1c
+
+
 struct brcmnand_soc {
 	bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
 	void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
 	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
+	u32 (*read_ecc_mips_reg)(struct brcmnand_soc *soc, u32 reg);
+	void (*write_ecc_mips_reg)(struct brcmnand_soc *soc, u32 reg, u32 value);
+	
 };
 
 static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
@@ -36,6 +43,32 @@ static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
 {
 	if (soc && soc->prepare_data_bus)
 		soc->prepare_data_bus(soc, false);
+}
+
+static inline u32 brcmnand_soc_ecc_uncorr(struct brcmnand_soc *soc)
+{
+	if (soc && soc->read_ecc_mips_reg)
+		return soc->read_ecc_mips_reg(soc, NAND_ECC_MIPS_UNCORR_REG);
+	return 1;  // Error emulation??
+}
+
+static inline u32 brcmnand_soc_ecc_corr(struct brcmnand_soc *soc)
+{
+	if (soc && soc->read_ecc_mips_reg)
+		return soc->read_ecc_mips_reg(soc, NAND_ECC_MIPS_CORR_REG);
+	return 1; // Error emulation??
+}
+
+static inline void brcmnand_soc_uncorr_ack(struct brcmnand_soc *soc)
+{
+	if (soc && soc->write_ecc_mips_reg)
+		soc->write_ecc_mips_reg(soc, NAND_ECC_MIPS_UNCORR_REG, 1);
+}
+
+static inline void brcmnand_soc_corr_ack(struct brcmnand_soc *soc)
+{
+	if (soc && soc->write_ecc_mips_reg)
+		soc->write_ecc_mips_reg(soc, NAND_ECC_MIPS_CORR_REG, 1);
 }
 
 static inline u32 brcmnand_readl(void __iomem *addr)
