@@ -871,12 +871,12 @@ static int cygnus_ssp_hw_params(struct snd_pcm_substream *substream,
 	u32 value;
 	u32 mask;
 	int ret = 0;
-
+/*
 	printk("[ADK] %s port = %d\n", __func__, aio->portnum);
 	printk("[ADK]\tparams_channels %d\n", params_channels(params));
 	printk("[ADK]\trate %d\n", params_rate(params));
 	printk("[ADK]\tformat %d\n", params_format(params));
-
+*/
 	rate = params_rate(params);
 
 	switch (aio->mode) {
@@ -1071,7 +1071,7 @@ static int cygnus_ssp_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 {
 	struct cygnus_aio_port *aio = cygnus_dai_get_portinfo(cpu_dai);
 
-	printk("[ADK] %s Enter  portnum=%d,  fmt: %x\n", __func__, aio->portnum, fmt);
+//	printk("[ADK] %s Enter  portnum=%d,  fmt: %x\n", __func__, aio->portnum, fmt);
 
 	if (aio->portnum == SPDIF)
 		return -EINVAL;
@@ -1108,7 +1108,7 @@ static int cygnus_ssp_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 			aio->fs_delay = 0;
 		}
 		aio->mode = CYGNUS_SSPMODE_TDM;
-printk("[ADK] %s port=%d: set to TDM mode\n", __func__, aio->portnum);
+// printk("[ADK] %s port=%d: set to TDM mode\n", __func__, aio->portnum);
 		break;
 
 	default:
@@ -1223,10 +1223,10 @@ static int cygnus_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
 	unsigned int bits_per_frame;
 	bool found = false;
 	unsigned int i;
-
+/*
 	printk("[ADK] %s Enter, tx/rx=0x%x/0x%x, slots=%d, slot_width=%d\n", __func__, 
 		tx_mask, rx_mask, slots, slot_width);
-
+*/
 	if (tx_mask != rx_mask) {
 		dev_err(aio->dev, "%s tx_mask must equal rx_mask\n", __func__);
 		return -EINVAL;

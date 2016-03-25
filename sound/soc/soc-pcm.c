@@ -732,7 +732,7 @@ enum cygnussvk_dai_fn_code {
 	DAPM_STREAM_EVENT,
 };
 
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 
 struct cygnussvk_dai_fn {
 	enum cygnussvk_dai_fn_code  fn;	// what we need to do ..
@@ -763,16 +763,16 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 	struct snd_soc_dai *codec_dai;
 	int i, ret = 0,  id;
 
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 	chnls = substream->runtime->channels;
 	
-printk("[ADK] %s entered, chnls=%d\n", __func__, chnls);
+//printk("[ADK] %s entered, chnls=%d\n", __func__, chnls);
 #endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
 	if (rtd->dai_link->ops && rtd->dai_link->ops->prepare) {
-printk("[ADK] %s/%d ==> rtd->dai_link->ops->prepare()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d ==> rtd->dai_link->ops->prepare()\n", __func__, __LINE__);
 		ret = rtd->dai_link->ops->prepare(substream);
 		if (ret < 0) {
 			dev_err(rtd->card->dev, "ASoC: machine prepare error:"
@@ -782,7 +782,7 @@ printk("[ADK] %s/%d ==> rtd->dai_link->ops->prepare()\n", __func__, __LINE__);
 	}
 
 	if (platform->driver->ops && platform->driver->ops->prepare) {
-printk("[ADK] %s/%d ==> platform->driver->ops->prepare()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d ==> platform->driver->ops->prepare()\n", __func__, __LINE__);
 		ret = platform->driver->ops->prepare(substream);
 		if (ret < 0) {
 			dev_err(platform->dev, "ASoC: platform prepare error:"
@@ -794,7 +794,7 @@ printk("[ADK] %s/%d ==> platform->driver->ops->prepare()\n", __func__, __LINE__)
 	for (i = 0; i < rtd->num_codecs; i++) {
 		codec_dai = rtd->codec_dais[i];
 		if (codec_dai->driver->ops && codec_dai->driver->ops->prepare) {
-printk("[ADK] %s/%d/%d ==> codec_dai->driver->ops->prepare()\n", __func__, __LINE__, i);
+//printk("[ADK] %s/%d/%d ==> codec_dai->driver->ops->prepare()\n", __func__, __LINE__, i);
 			ret = codec_dai->driver->ops->prepare(substream,
 							      codec_dai);
 			if (ret < 0) {
@@ -806,14 +806,14 @@ printk("[ADK] %s/%d/%d ==> codec_dai->driver->ops->prepare()\n", __func__, __LIN
 		}
 	}
 	
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 	id = cygnussvk_get_dai_id(rtd->dai_link);
 	if (id == 0) {
 		if (chnls == 8) {
 			cygnussvk_codec_fn _fn = codec_fn;
 			struct cygnussvk_dai_fn todo;
 
-printk("[ADK] %s/%d: start setup ..\n", __func__, __LINE__);
+//printk("[ADK] %s/%d: start setup ..\n", __func__, __LINE__);
 			
 			todo.fn = DAI_PREPARE;
 			todo.args[0] = (unsigned int)substream;
@@ -825,7 +825,7 @@ printk("[ADK] %s/%d: start setup ..\n", __func__, __LINE__);
 
 
 	if (cpu_dai->driver->ops && cpu_dai->driver->ops->prepare) {
-printk("[ADK] %s/%d ==> cpu_dai->driver->ops->prepare()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d ==> cpu_dai->driver->ops->prepare()\n", __func__, __LINE__);
 		ret = cpu_dai->driver->ops->prepare(substream, cpu_dai);
 		if (ret < 0) {
 			dev_err(cpu_dai->dev,
@@ -866,7 +866,7 @@ printk("[ADK] %s/%d: id=%d, chnls=%d\n", __func__, __LINE__, id, chnls);
 
 out:
 	mutex_unlock(&rtd->pcm_mutex);
-printk("[ADK] %s finished\n", __func__);
+//printk("[ADK] %s finished\n", __func__);
 	return ret;
 }
 
@@ -913,7 +913,7 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int i, ret = 0, id, chnls =0;
 
-printk("[ADK] %s entered\n", __func__);
+//printk("[ADK] %s entered\n", __func__);
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
@@ -922,7 +922,7 @@ printk("[ADK] %s entered\n", __func__);
 		goto out;
 
 	if (rtd->dai_link->ops && rtd->dai_link->ops->hw_params) {
-printk("[ADK] %s/%d =>rtd->dai_link->ops->hw_params()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d =>rtd->dai_link->ops->hw_params()\n", __func__, __LINE__);
 		ret = rtd->dai_link->ops->hw_params(substream, params);
 		if (ret < 0) {
 			dev_err(rtd->card->dev, "ASoC: machine hw_params"
@@ -934,7 +934,7 @@ printk("[ADK] %s/%d =>rtd->dai_link->ops->hw_params()\n", __func__, __LINE__);
 	for (i = 0; i < rtd->num_codecs; i++) {
 		struct snd_soc_dai *codec_dai = rtd->codec_dais[i];
 		struct snd_pcm_hw_params codec_params;
-printk("[ADK] %s/%d: i=%d\n", __func__, __LINE__, i);
+//printk("[ADK] %s/%d: i=%d\n", __func__, __LINE__, i);
 
 		/*
 		 * Skip CODECs which don't support the current stream type,
@@ -964,7 +964,7 @@ printk("[ADK] %s/%d: i=%d\n", __func__, __LINE__, i);
 			soc_pcm_codec_params_fixup(&codec_params,
 						   codec_dai->rx_mask);
 
-printk("[ADK] %s/%d: =>soc_dai_hw_params()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d: =>soc_dai_hw_params()\n", __func__, __LINE__);
 		ret = soc_dai_hw_params(substream, &codec_params, codec_dai);
 		if(ret < 0)
 			goto codec_err;
@@ -975,14 +975,14 @@ printk("[ADK] %s/%d: =>soc_dai_hw_params()\n", __func__, __LINE__);
 						params_format(&codec_params));
 	}
 
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 	id = cygnussvk_get_dai_id(rtd->dai_link);
 	if (id == 0) {
 		if (chnls == 8) {
 			cygnussvk_codec_fn _fn = codec_fn;
 			struct cygnussvk_dai_fn todo;
 
-printk("[ADK] %s/%d: start setup ..\n", __func__, __LINE__);
+//printk("[ADK] %s/%d: start setup ..\n", __func__, __LINE__);
 			
 			todo.fn = DAI_SET_HW;
 			todo.args[0] = (unsigned int)substream;
@@ -992,13 +992,13 @@ printk("[ADK] %s/%d: start setup ..\n", __func__, __LINE__);
 	}
 #endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
 
-printk("[ADK] %s/%d: =>soc_dai_hw_params()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d: =>soc_dai_hw_params()\n", __func__, __LINE__);
 	ret = soc_dai_hw_params(substream, params, cpu_dai);
 	if (ret < 0)
 		goto interface_err;
 
 	if (platform->driver->ops && platform->driver->ops->hw_params) {
-printk("[ADK] %s/%d: =>platform->driver->ops->hw_params()\n", __func__, __LINE__);
+//printk("[ADK] %s/%d: =>platform->driver->ops->hw_params()\n", __func__, __LINE__);
 		ret = platform->driver->ops->hw_params(substream, params);
 		if (ret < 0) {
 			dev_err(platform->dev, "ASoC: %s hw params failed: %d\n",
@@ -1015,7 +1015,7 @@ printk("[ADK] %s/%d: =>platform->driver->ops->hw_params()\n", __func__, __LINE__
 
 out:
 	mutex_unlock(&rtd->pcm_mutex);
-printk("[ADK] %s finished\n", __func__);
+//printk("[ADK] %s finished\n", __func__);
 	return ret;
 
 platform_err:

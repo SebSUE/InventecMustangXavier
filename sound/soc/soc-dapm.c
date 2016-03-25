@@ -167,7 +167,7 @@ enum cygnussvk_dai_fn_code {
 };
 
 
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 
 	struct cygnussvk_dai_fn {
 	enum cygnussvk_dai_fn_code  fn;	// what we need to do ..
@@ -596,13 +596,13 @@ static int soc_dapm_update_bits(struct snd_soc_dapm_context *dapm,
 	int reg, unsigned int mask, unsigned int value)
 {
 
+/*
 if (reg == 19 || reg == 22) {
 	printk("[ADK] %s eneterd, reg=%d\n", __func__, reg);
-/*
 	dump_stack();
 	printk("[ADK] %s ===========\n", __func__);
-*/	
 }
+*/	
 
 	if (!dapm->component)
 		return -EIO;
@@ -1475,18 +1475,18 @@ static void dapm_seq_run_coalesced(struct snd_soc_card *card,
 		 
 		struct snd_soc_codec *codec = snd_soc_dapm_to_codec(dapm);
 		
-		
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+/*		
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 		printk("[ADK]\t%s update reg=%d, codec=[%s], id=%d, chnls=%d\n", __func__, reg, codec->component.name, aic3x_get_id(codec), snd_soc_get_chnls());
 #endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
-
+*/
 		pop_dbg(dapm->dev, card->pop_time,
 			"pop test : Applying 0x%x/0x%x to %x in %dms\n",
 			value, mask, reg, card->pop_time);
 		pop_wait(card->pop_time);
 		soc_dapm_update_bits(dapm, reg, mask, value);
 
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 
 		if (aic3x_get_id(codec) == 0) {
 			if (snd_soc_get_chnls() == 8) {
@@ -4026,7 +4026,7 @@ void snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 {
 	struct snd_soc_card *card = rtd->card;
 
-printk("[ADK] %s entered, stream=%d, event=%d\n", __func__, stream, event);
+// printk("[ADK] %s entered, stream=%d, event=%d\n", __func__, stream, event);
 
 	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
 	soc_dapm_stream_event(rtd, stream, event);

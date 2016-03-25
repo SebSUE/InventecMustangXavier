@@ -49,30 +49,33 @@
 	};
 
 	sound {
-		compatible = "bcm,cygnussvk-machine";
+/*		compatible = "bcm,cygnussvk-machine";  */
+		compatible = "bcm,cygnus-hoka-machine";
 		bcm,cygnus-pcm = <&cygnus_audio>;
-/*		bcm,cygnus-link1-ssp = "cygnus-ssp1"; */
-		bcm,cygnussvk-machine,format = "dsp_b";
 
 		bcm,cygnus-link0-codec = <&tlv320aic34_1A>;
 		bcm,cygnus-link0-ssp = "cygnus-ssp0";
 		bcm,cygnus-link0-mode = "tdm";
 		bcm,cygnus-link0-slave = <1>;
+		bcm,cygnus-link0-frame-width = <128>;
 
 		bcm,cygnus-link1-codec = <&tlv320aic34_1B>;
 		bcm,cygnus-link1-ssp = "cygnus-ssp0";
 		bcm,cygnus-link1-mode = "tdm";
 		bcm,cygnus-link1-slave = <1>;
+		bcm,cygnus-link1-frame-width = <128>;
 
 		bcm,cygnus-link2-codec = <&tlv320aic34_2A>;
 		bcm,cygnus-link2-ssp = "cygnus-ssp0";
 		bcm,cygnus-link2-mode = "tdm";
 		bcm,cygnus-link2-slave = <1>;
+		bcm,cygnus-link2-frame-width = <128>;
 
 		bcm,cygnus-link3-codec = <&tlv320aic34_2B>;
 		bcm,cygnus-link3-ssp = "cygnus-ssp0";
 		bcm,cygnus-link3-mode = "tdm";
 		bcm,cygnus-link3-slave = <1>;
+		bcm,cygnus-link3-frame-width = <128>;
 
 		status = "okay";
 

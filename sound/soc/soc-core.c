@@ -2221,7 +2221,7 @@ int snd_soc_dai_set_tdm_slot(struct snd_soc_dai *dai,
 	unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
 {
 
-	printk("[ADK] %s entered\n", __func__);
+//	printk("[ADK] %s entered\n", __func__);
 
 	if (dai->driver && dai->driver->ops->xlate_tdm_slot_mask)
 		dai->driver->ops->xlate_tdm_slot_mask(slots,
@@ -3066,7 +3066,7 @@ int snd_soc_register_codec(struct device *dev,
 	if (codec == NULL)
 		return -ENOMEM;
 
-	printk("[ADK] %s: codec register [%s]@%p\n", __func__, dev_name(dev), codec);
+//	printk("[ADK] %s: codec register [%s]@%p\n", __func__, dev_name(dev), codec);
 
 	codec->component.codec = codec;
 
