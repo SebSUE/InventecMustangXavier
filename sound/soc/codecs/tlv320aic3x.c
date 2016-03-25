@@ -94,6 +94,7 @@ struct aic3x_priv {
 	/* Selects the micbias voltage */
 	enum aic3x_micbias_voltage micbias_vg;
 	int id;
+	int i2c_bus;
 };
 
 static const struct reg_default aic3x_reg_18[] = {
@@ -2651,6 +2652,12 @@ int aic3x_get_id(struct snd_soc_codec *codec)
 	return aic3x->id;
 }
 
+int aic3x_get_bus(struct snd_soc_codec *codec) 
+{
+	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
+	return aic3x->i2c_bus;
+}
+
 static int aic3x_add_widgets(struct snd_soc_codec *codec)
 {
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
@@ -2735,7 +2742,7 @@ static int aic3x_hw_params(struct snd_pcm_substream *substream,
 	int clk;
 	int width = aic3x->slot_width;
 
-printk("[ADK] %s enetred\n", __func__);
+// printk("[ADK] %s enetred\n", __func__);
 
 	if (!width)
 		width = params_width(params);
@@ -2884,21 +2891,33 @@ found:
 	struct snd_soc_codec *codec = dai->codec;
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
 //	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	int delay = 0, id = (-1);
+	int delay = 0, id = (-1), bus;
 	int width = aic3x->slot_width;
 
 //	id = cygnussvk_get_dai_id(rtd->dai_link); 
 
+	bus = aic3x_get_bus(codec);
 
-	if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-0018")) id = 0; 
-	else
-	if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-0019")) id = 1; 
-	else
-	if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-001a")) id = 2; 
-	else
-	if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-001b")) id = 3; 
+	if (bus == 0) {
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-0018")) id = 0; 
+		else
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-0019")) id = 1; 
+		else
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-001a")) id = 2; 
+		else
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.0-001b")) id = 3; 
+	}
+	if (bus == 1) {
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.1-0018")) id = 0; 
+		else
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.1-0019")) id = 1; 
+		else
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.1-001a")) id = 2; 
+		else
+		if (!strcmp(codec->component.name, "tlv320aic3x-codec.1-001b")) id = 3; 
+	}
 
-printk("[ADK] %s enetred, id=%d, tdm_delay=%d, [%s]\n", __func__, id, aic3x->tdm_delay, codec->component.name);
+// printk("[ADK] %s enetred, id=%d, tdm_delay=%d, [%s]\n", __func__, id, aic3x->tdm_delay, codec->component.name);
 
 
 	if (id < 0) return 0;
@@ -2908,7 +2927,7 @@ printk("[ADK] %s enetred, id=%d, tdm_delay=%d, [%s]\n", __func__, id, aic3x->tdm
 
 	
 	delay = width * 2 /* [ADK] all four really use only 2-chanhhels: substream->runtime->channels*/ * id;
-printk("[ADK]\t%s width=%d, channels=%d, delay=%d\n", __func__, width, substream->runtime->channels, delay);
+// printk("[ADK]\t%s width=%d, channels=%d, delay=%d\n", __func__, width, substream->runtime->channels, delay);
 
 	/* TDM slot selection only valid in DSP_A/_B mode */
 	if (aic3x->dai_fmt == SND_SOC_DAIFMT_DSP_A)
@@ -2951,7 +2970,7 @@ static int aic3x_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	struct snd_soc_codec *codec = codec_dai->codec;
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
 	
-printk("[ADK]\t%s: aic3x->id=%d, clk_id=%d, freq=%d\n", __func__, aic3x->id, clk_id, freq);
+// printk("[ADK]\t%s: aic3x->id=%d, clk_id=%d, freq=%d\n", __func__, aic3x->id, clk_id, freq);
 
 	/* set clock on MCLK or GPIO2 or BCLK */
 	snd_soc_update_bits(codec, AIC3X_CLKGEN_CTRL_REG, PLLCLK_IN_MASK,
@@ -2970,7 +2989,7 @@ static int aic3x_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
 	u8 iface_areg, iface_breg;
 
-printk("[ADK] %s enetred\n", __func__);
+// printk("[ADK] %s enetred, fmt=0x%x\n", __func__, fmt);
 
 	iface_areg = snd_soc_read(codec, AIC3X_ASD_INTF_CTRLA) & 0x3f;
 	iface_breg = snd_soc_read(codec, AIC3X_ASD_INTF_CTRLB) & 0x3f;
@@ -3019,7 +3038,7 @@ printk("[ADK] Ups@%s/%d\n", __func__, __LINE__);
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLA, iface_areg);
 	snd_soc_write(codec, AIC3X_ASD_INTF_CTRLB, iface_breg);
 
-printk("[ADK] %s finished\n", __func__);
+//printk("[ADK] %s finished\n", __func__);
 
 	return 0;
 }
@@ -3032,7 +3051,7 @@ static int aic3x_set_dai_tdm_slot(struct snd_soc_dai *codec_dai,
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
 	unsigned int lsb;
 
-printk("[ADK] %s enetred\n", __func__);
+//printk("[ADK] %s enetred\n", __func__);
 
 	if (tx_mask != rx_mask) {
 		dev_err(codec->dev, "tx and rx masks must be symmetric\n");
@@ -3098,7 +3117,7 @@ static int aic3x_set_power(struct snd_soc_codec *codec, int power)
 	unsigned int pll_c, pll_d;
 	int ret;
 
-printk("[ADK] %s entered, id=%d, power=%d\n", __func__, aic3x->id, power);
+// printk("[ADK] %s entered, id=%d, power=%d\n", __func__, aic3x->id, power);
 
 	if (power) {
 		ret = regulator_bulk_enable(ARRAY_SIZE(aic3x->supplies),
@@ -3156,11 +3175,13 @@ printk("[ADK] %s entered, id=%d, power=%d\n", __func__, aic3x->id, power);
 		snd_soc_update_bits(codec, LINE1R_2_RADC_CTRL, 0x4, 1);
 	} else {
 // [ADK] debugging output
-		int regId;
+
+//		int regId;
 		regcache_mark_dirty(aic3x->regmap);
+/*
 		for(regId = 2; regId < 110; regId++)
 			printk("[ADK]\tRegister % 3d\t=0x%02x\n", regId, snd_soc_read(codec, regId));
-		
+*/		
 		/*
 		 * Do soft reset to this codec instance in order to clear
 		 * possible VDD leakage currents in case the supply regulators
@@ -3176,7 +3197,7 @@ printk("[ADK] %s entered, id=%d, power=%d\n", __func__, aic3x->id, power);
 					     aic3x->supplies);
 	}
 out:
-printk("[ADK] %s finished\n", __func__);
+// printk("[ADK] %s finished\n", __func__);
 	return ret;
 }
 
@@ -3187,7 +3208,7 @@ int cygnussvk_powerup_aic3x(struct snd_soc_codec *codec, enum snd_soc_bias_level
 {
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
 
-printk("[ADK]\t%s entered, id=%d, level=%d, power=%d\n", __func__, aic3x->id, level, aic3x->power);
+// printk("[ADK]\t%s entered, id=%d, level=%d, power=%d\n", __func__, aic3x->id, level, aic3x->power);
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
@@ -3216,7 +3237,7 @@ printk("[ADK]\t%s entered, id=%d, level=%d, power=%d\n", __func__, aic3x->id, le
 		break;
 	}
 
-#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+#if defined(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) || defined(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE)
 	if (aic3x->id == 0)
 		cygnussvk_powerup_aic3x(codec, level);
 #endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
@@ -3299,7 +3320,7 @@ static int aic3x_init(struct snd_soc_codec *codec)
 {
 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
 
-printk("[ADK] %s enetered\n", __func__);
+// printk("[ADK] %s enetered\n", __func__);
 
 	snd_soc_write(codec, AIC3X_PAGE_SELECT, PAGE0_SELECT);
 //[ADK] keep clock configuration from u-boot .. 	snd_soc_write(codec, AIC3X_RESET, SOFT_RESET);
@@ -3373,7 +3394,7 @@ printk("[ADK] %s enetered\n", __func__);
 		snd_soc_write(codec, CLASSD_CTRL, 0);
 		break;
 	}
-printk("[ADK] %s finished OK\n", __func__);
+// printk("[ADK] %s finished OK\n", __func__);
 
 	return 0;
 }
@@ -3599,17 +3620,17 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
 	int ret, i;
 	u32 value;
 
-printk("[ADK] %s entered, I2C: %x-[%s]\n", __func__, i2c->addr, i2c->name);
+// printk("[ADK] %s entered, I2C: %x-[%s], adapter=%d:[%s]\n", __func__, i2c->addr, i2c->name, i2c->adapter->nr, i2c->adapter->name);
 
 	aic3x = devm_kzalloc(&i2c->dev, sizeof(struct aic3x_priv), GFP_KERNEL);
 	if (!aic3x)
 		return -ENOMEM;
 
 	switch (i2c->addr) {
-		case 0x18: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_18); aic3x->id = 0; break;
-		case 0x19: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_19); aic3x->id = 1; break;
-		case 0x1a: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_1a); aic3x->id = 2; break;
-		case 0x1b: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_1b); aic3x->id = 3; break;
+		case 0x18: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_18); aic3x->id = 0; aic3x->i2c_bus =i2c->adapter->nr; break;
+		case 0x19: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_19); aic3x->id = 1; aic3x->i2c_bus =i2c->adapter->nr; break;
+		case 0x1a: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_1a); aic3x->id = 2; aic3x->i2c_bus =i2c->adapter->nr; break;
+		case 0x1b: 		aic3x->regmap = devm_regmap_init_i2c(i2c, &aic3x_regmap_1b); aic3x->id = 3; aic3x->i2c_bus =i2c->adapter->nr; break;
 		default:
 			return -ENODEV;
 	}
@@ -3638,7 +3659,7 @@ printk("[ADK] %s entered, I2C: %x-[%s]\n", __func__, i2c->addr, i2c->name);
 		else
 			aic3x->gpio_reset = -1;
 		
-printk("[ADK] %s gpio_reset=%d\n", __func__, aic3x->gpio_reset);
+// printk("[ADK] %s gpio_reset=%d\n", __func__, aic3x->gpio_reset);
 
 		if (of_property_read_u32_array(np, "ai3x-gpio-func",
 					ai3x_setup->gpio_func, 2) >= 0) {
@@ -3671,18 +3692,18 @@ printk("[ADK] %s gpio_reset=%d\n", __func__, aic3x->gpio_reset);
 
 	aic3x->model = id->driver_data;
 
-printk("[ADK] %s%d\n", __func__, __LINE__);
+// printk("[ADK] %s%d\n", __func__, __LINE__);
 
 	if (gpio_is_valid(aic3x->gpio_reset) &&
 	    !aic3x_is_shared_reset(aic3x)) {
-printk("[ADK] %s%d\n", __func__, __LINE__);
+// printk("[ADK] %s%d\n", __func__, __LINE__);
 		ret = gpio_request(aic3x->gpio_reset, "tlv320aic3x reset");
 		if (ret != 0)
 			goto err;
-printk("[ADK] %s%d\n", __func__, __LINE__);
+// printk("[ADK] %s%d\n", __func__, __LINE__);
 		gpio_direction_output(aic3x->gpio_reset, 0);
 	}
-printk("[ADK] %s%d\n", __func__, __LINE__);
+// printk("[ADK] %s%d\n", __func__, __LINE__);
 
 	for (i = 0; i < ARRAY_SIZE(aic3x->supplies); i++)
 		aic3x->supplies[i].supply = aic3x_supply_names[i];

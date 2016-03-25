@@ -56,7 +56,7 @@ EXPORT_SYMBOL_GPL(snd_soc_component_read);
 int snd_soc_component_write(struct snd_soc_component *component,
 	unsigned int reg, unsigned int val)
 {
-printk("[ADK] %s I2C: reg %d:=0x%x\n", __func__, reg, val);
+// printk("[ADK] %s I2C: reg %d:=0x%x\n", __func__, reg, val);
 	if (component->regmap)
 		return regmap_write(component->regmap, reg, val);
 	else if (component->write) {

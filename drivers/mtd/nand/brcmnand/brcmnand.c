@@ -945,27 +945,29 @@ static int read_oob_from_regs(struct brcmnand_controller *ctrl, int i, u8 *oob,
 {
 	int tbytes = sas << sector_1k;
 	int j;
+/*	
 if (brcmnand_debug)
 	printk("[ADK] %s i=%d, 1k=%d, sas=%d\n", __func__, i, sector_1k, sas);
-
+*/
 
 	/* Adjust OOB values for 1K sector size */
 	if (sector_1k && (i & 0x01))
 		tbytes = max(0, tbytes - (int)ctrl->max_oob);
 	tbytes = min_t(int, tbytes, ctrl->max_oob);
-
+/*
 if (brcmnand_debug)
 	printk("[ADK] %s tbytes=%d\n", __func__, tbytes);
-
+*/
 	for (j = 0; j < tbytes; j++) 
 		oob[j] = oob_reg_read(ctrl, j);
-
+/*
 if (brcmnand_debug && tbytes) {
 	printk("[ADK] %s OOB:\n", __func__);
 	print_hex_dump(KERN_CONT, "", DUMP_PREFIX_OFFSET,
 			16, 1,
 			oob, tbytes, false);
 }
+*/
 	return tbytes;
 }
 
@@ -981,10 +983,10 @@ static int write_oob_to_regs(struct brcmnand_controller *ctrl, int i,
 {
 	int tbytes = sas << sector_1k;
 	int j;
-	
+/*	
 if (brcmnand_debug)
 	printk("[ADK] %s i=%d, sas=%d, 1k=%d\n", __func__, i, sas, sector_1k);
-
+*/
 	/* Adjust OOB values for 1K sector size */
 	if (sector_1k && (i & 0x01))
 		tbytes = max(0, tbytes - (int)ctrl->max_oob);
@@ -1394,10 +1396,11 @@ static int brcmnand_dma_trans(struct brcmnand_host *host, u64 addr, u32 *buf,
 	dma_addr_t buf_pa;
 	int dir = dma_cmd == CMD_PAGE_READ ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 
+/*
 if (brcmnand_debug) {
 	printk("[ADK] %s %llx %s %p,  %d bytes\n", __func__, (unsigned long long)addr, ((dma_cmd == CMD_PAGE_READ)? "->" : "<-"), 	buf, len);
 }
-
+*/
 	buf_pa = dma_map_single(ctrl->dev, buf, len, dir);
 	if (dma_mapping_error(ctrl->dev, buf_pa)) {
 		dev_err(ctrl->dev, "unable to map buffer for DMA\n");
@@ -1412,13 +1415,13 @@ if (brcmnand_debug) {
 	dma_unmap_single(ctrl->dev, buf_pa, len, dir);
 
 	if (ctrl->dma_desc->status_valid & FLASH_DMA_ECC_ERROR) {
-if (brcmnand_debug)
-	printk("[ADK] %s done with uncorrectable ECC error\n", __func__)	;
+/* if (brcmnand_debug)
+	printk("[ADK] %s done with uncorrectable ECC error\n", __func__)	; */
 		return -EBADMSG;
 	}
 	else if (ctrl->dma_desc->status_valid & FLASH_DMA_CORR_ERROR) {
-if (brcmnand_debug)
-	printk("[ADK] %s done with correctable ECC error\n", __func__);	
+/* if (brcmnand_debug)
+	printk("[ADK] %s done with correctable ECC error\n", __func__);	 */
 		return -EUCLEAN;
 	}
 
@@ -1436,10 +1439,10 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
 	struct brcmnand_controller *ctrl = host->ctrl;
 	int i, j, ret = 0;
 	u64 start_addr = addr;
-
+/*
 if (brcmnand_debug)
 	printk("[ADK] %s read %llx -> %p (trans=%d, oob=%p)\n", __func__, (unsigned long long)addr, buf, trans, oob);
-
+*/
 	/* Clear error addresses */
 	brcmnand_write_reg(ctrl, BRCMNAND_UNCORR_ADDR, 0);
 	brcmnand_write_reg(ctrl, BRCMNAND_CORR_ADDR, 0);
@@ -1474,8 +1477,8 @@ if (brcmnand_debug)
 		if (!ret) {
 			if (buf && (!host->hwcfg.sector_size_1k || (i & 0x1))) {
 				if (brcmnand_soc_ecc_uncorr(ctrl->soc)) {
-if (brcmnand_debug)
-	printk("[ADK] %s got uncorrectable ECC error ..\n", __func__);				
+/*if (brcmnand_debug)
+	printk("[ADK] %s got uncorrectable ECC error ..\n", __func__);				 */
 					brcmnand_soc_uncorr_ack(ctrl->soc);
 					*err_addr = brcmnand_read_reg(ctrl,
 						BRCMNAND_UNCORR_ADDR) |
@@ -1484,8 +1487,8 @@ if (brcmnand_debug)
 					if (*err_addr) {
 						if ((unsigned long long)(*err_addr) > ((unsigned long long)addr - FC_BYTES)) {
 							ret = -EBADMSG;
-if (/*(unsigned long long)start_addr == 0x100000ll ||*/ brcmnand_debug )
-printk("[ADK] %s: uncerror@0x%llx (0x%llx/0x%llx)\n", __func__, *err_addr, (unsigned long long)start_addr, (unsigned long long)addr);				
+/* if (/ *(unsigned long long)start_addr == 0x100000ll ||* / brcmnand_debug )
+printk("[ADK] %s: uncerror@0x%llx (0x%llx/0x%llx)\n", __func__, *err_addr, (unsigned long long)start_addr, (unsigned long long)addr); */
 						}else{
 							/* Clear error addresses */
 							brcmnand_write_reg(ctrl, BRCMNAND_UNCORR_ADDR, 0);
@@ -1565,8 +1568,8 @@ if ((unsigned long long)addr == 0x3ffe0000ll)
 	if (mtd_is_eccerr(err)) {
 		dev_dbg(ctrl->dev, "uncorrectable error at 0x%llx\n",
 			(unsigned long long)err_addr);
-if (brcmnand_debug)
-	printk("[ADK] %s uncorrectable error at 0x%llx\n", __func__, (unsigned long long)err_addr);
+/* if (brcmnand_debug)
+	printk("[ADK] %s uncorrectable error at 0x%llx\n", __func__, (unsigned long long)err_addr); */
 		mtd->ecc_stats.failed++;
 		/* NAND layer expects zero on ECC errors */
 		return 0;
@@ -1577,8 +1580,8 @@ if (brcmnand_debug)
 
 		dev_dbg(ctrl->dev, "corrected error at 0x%llx\n",
 			(unsigned long long)err_addr);
-if ((unsigned long long)addr == 0x1a00000ll)
-	printk("[ADK] %s corrected error at 0x%llx\n", __func__, (unsigned long long)err_addr);
+/* if ((unsigned long long)addr == 0x1a00000ll)
+	printk("[ADK] %s corrected error at 0x%llx\n", __func__, (unsigned long long)err_addr); */
 		mtd->ecc_stats.corrected += corrected;
 		/* Always exceed the software-imposed threshold */
 		return max(mtd->bitflip_threshold, corrected);
@@ -2248,7 +2251,7 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 		ctrl->nand_fc = ctrl->nand_base +
 				ctrl->reg_offsets[BRCMNAND_FC_BASE];
 	}
-printk("[ADK] %s  base@%p, nand_fc@%p\n", __func__, ctrl->nand_base, ctrl->nand_fc);
+// printk("[ADK] %s  base@%p, nand_fc@%p\n", __func__, ctrl->nand_base, ctrl->nand_fc);
 
 	/* FLASH_DMA */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "flash-dma");
