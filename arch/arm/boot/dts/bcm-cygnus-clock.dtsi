@@ -103,6 +103,7 @@ clocks {
 				     "usb_phy", "smart_card", "ch5";
 	};
 
+/*----------------------
 	mipipll: mipipll {
 		#clock-cells = <1>;
 		compatible = "brcm,cygnus-mipipll";
@@ -112,7 +113,7 @@ clocks {
 				     "ch2_v3d", "ch3_unused", "ch4_unused",
 				     "ch5_unused";
 	};
-
+-------------------------- */
 	asiu_clks: asiu_clks {
 		#clock-cells = <1>;
 		compatible = "brcm,cygnus-asiu-clk";
@@ -120,5 +121,14 @@ clocks {
 
 		clocks = <&osc>;
 		clock-output-names = "keypad", "adc/touch", "pwm";
+	};
+
+	audiopll: audiopll {
+		#clock-cells = <1>;
+		compatible = "brcm,cygnus-audiopll";
+		reg = <0x180aeb00 0x68>;
+		clocks = <&osc>;
+		clock-output-names = "audiopll", "ch0_audio",
+					"ch1_audio", "ch2_audio";
 	};
 };

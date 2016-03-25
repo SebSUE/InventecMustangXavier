@@ -29,6 +29,7 @@ int snd_soc_component_read(struct snd_soc_component *component,
 	unsigned int reg, unsigned int *val)
 {
 	int ret;
+//	uint8_t *p; 
 
 	if (component->regmap)
 		ret = regmap_read(component->regmap, reg, val);
@@ -36,7 +37,10 @@ int snd_soc_component_read(struct snd_soc_component *component,
 		ret = component->read(component, reg, val);
 	else
 		ret = -EIO;
-
+/*	
+p = (uint8_t *)val;	
+printk("[ADK] %s I2C: reg %d ->0x%x\n", __func__, reg, p[0]);
+*/
 	return ret;
 }
 EXPORT_SYMBOL_GPL(snd_soc_component_read);
@@ -52,10 +56,13 @@ EXPORT_SYMBOL_GPL(snd_soc_component_read);
 int snd_soc_component_write(struct snd_soc_component *component,
 	unsigned int reg, unsigned int val)
 {
+printk("[ADK] %s I2C: reg %d:=0x%x\n", __func__, reg, val);
 	if (component->regmap)
 		return regmap_write(component->regmap, reg, val);
-	else if (component->write)
+	else if (component->write) {
+//printk("[ADK] %s No regmap ..\n", __func__);
 		return component->write(component, reg, val);
+	}
 	else
 		return -EIO;
 }

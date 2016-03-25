@@ -3,3 +3,12 @@ snd-soc-bcm2835-i2s-objs := bcm2835-i2s.o
 
 obj-$(CONFIG_SND_BCM2835_SOC_I2S) += snd-soc-bcm2835-i2s.o
 
+# CYGNUS Platform Support
+snd-soc-cygnus-objs := cygnus-pcm.o cygnus-ssp.o
+snd-soc-cygnus-svk-machine-objs := cygnus_svk-machine.o
+
+
+obj-$(CONFIG_SND_SOC_CYGNUS) += snd-soc-cygnus.o
+obj-$(CONFIG_SND_SOC_CYGNUS_SVK_MACHINE) += snd-soc-cygnus-svk-machine.o
+obj-$(CONFIG_SND_SOC_CYGNUS_HOKA_MACHINE) += hoka-machine.o
+

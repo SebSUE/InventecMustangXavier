@@ -23,6 +23,8 @@ static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
 	struct i2c_client *i2c = to_i2c_client(dev);
 	int ret;
 
+//printk("[ADK] %s entered\n", __func__);
+
 	if (reg > 0xff)
 		return -EINVAL;
 
@@ -40,6 +42,8 @@ static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
 {
 	struct device *dev = context;
 	struct i2c_client *i2c = to_i2c_client(dev);
+
+//printk("[ADK] %s entered\n", __func__);
 
 	if (val > 0xff || reg > 0xff)
 		return -EINVAL;
@@ -76,6 +80,8 @@ static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
 {
 	struct device *dev = context;
 	struct i2c_client *i2c = to_i2c_client(dev);
+
+//printk("[ADK] %s entered\n", __func__);
 
 	if (val > 0xffff || reg > 0xff)
 		return -EINVAL;
@@ -130,6 +136,8 @@ static int regmap_i2c_write(void *context, const void *data, size_t count)
 	struct i2c_client *i2c = to_i2c_client(dev);
 	int ret;
 
+//printk("[ADK] %s entered\n", __func__);
+
 	ret = i2c_master_send(i2c, data, count);
 	if (ret == count)
 		return 0;
@@ -182,6 +190,8 @@ static int regmap_i2c_read(void *context,
 	struct i2c_msg xfer[2];
 	int ret;
 
+// printk("[ADK] %s entered\n", __func__);
+
 	xfer[0].addr = i2c->addr;
 	xfer[0].flags = 0;
 	xfer[0].len = reg_size;
@@ -215,6 +225,8 @@ static int regmap_i2c_smbus_i2c_write(void *context, const void *data,
 	struct device *dev = context;
 	struct i2c_client *i2c = to_i2c_client(dev);
 
+//printk("[ADK] %s entered\n", __func__);
+
 	if (count < 1)
 		return -EINVAL;
 	if (count >= I2C_SMBUS_BLOCK_MAX)
@@ -232,6 +244,8 @@ static int regmap_i2c_smbus_i2c_read(void *context, const void *reg,
 	struct device *dev = context;
 	struct i2c_client *i2c = to_i2c_client(dev);
 	int ret;
+
+// printk("[ADK] %s entered\n", __func__);
 
 	if (reg_size != 1 || val_size < 1)
 		return -EINVAL;
@@ -257,28 +271,42 @@ static struct regmap_bus regmap_i2c_smbus_i2c_block = {
 static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
 					const struct regmap_config *config)
 {
-	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
+
+//printk("[ADK] %s entered\n", __func__);
+
+	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 		return &regmap_i2c;
+	}
 	else if (config->reg_bits == 8 &&
 		 i2c_check_functionality(i2c->adapter,
-					 I2C_FUNC_SMBUS_I2C_BLOCK))
+					 I2C_FUNC_SMBUS_I2C_BLOCK)) {
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 		return &regmap_i2c_smbus_i2c_block;
+	}
 	else if (config->val_bits == 16 && config->reg_bits == 8 &&
 		 i2c_check_functionality(i2c->adapter,
-					 I2C_FUNC_SMBUS_WORD_DATA))
+					 I2C_FUNC_SMBUS_WORD_DATA)) {
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 		switch (regmap_get_val_endian(&i2c->dev, NULL, config)) {
 		case REGMAP_ENDIAN_LITTLE:
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 			return &regmap_smbus_word;
 		case REGMAP_ENDIAN_BIG:
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 			return &regmap_smbus_word_swapped;
 		default:		/* everything else is not supported */
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 			break;
 		}
+	}
 	else if (config->val_bits == 8 && config->reg_bits == 8 &&
 		 i2c_check_functionality(i2c->adapter,
-					 I2C_FUNC_SMBUS_BYTE_DATA))
+					 I2C_FUNC_SMBUS_BYTE_DATA)) {
+//printk("[ADK]\t%s/%d\n", __func__, __LINE__);
 		return &regmap_smbus_byte;
-
+	}
+//printk("[ADK]\t%s FAIL..\n", __func__);
 	return ERR_PTR(-ENOTSUPP);
 }
 
@@ -288,6 +316,8 @@ struct regmap *__regmap_init_i2c(struct i2c_client *i2c,
 				 const char *lock_name)
 {
 	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
+
+//printk("[ADK] %s entered\n", __func__);
 
 	if (IS_ERR(bus))
 		return ERR_CAST(bus);
@@ -303,6 +333,7 @@ struct regmap *__devm_regmap_init_i2c(struct i2c_client *i2c,
 				      const char *lock_name)
 {
 	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
+//printk("[ADK] %s entered, bus@%p, write@%p, reg_write@%p\n", __func__, (void *)bus, (void *)bus->write, (void *)bus->reg_write);
 
 	if (IS_ERR(bus))
 		return ERR_CAST(bus);

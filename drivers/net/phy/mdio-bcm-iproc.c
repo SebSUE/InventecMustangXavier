@@ -77,6 +77,8 @@ static int iproc_mdio_read(struct mii_bus *bus, int phy_id, int reg)
 	u32 cmd;
 	int rc;
 
+// printk("[ADK]\t\t%s entered\n", __func__);
+
 	rc = iproc_mdio_wait_for_idle(priv->base);
 	if (rc)
 		return rc;
@@ -108,6 +110,8 @@ static int iproc_mdio_write(struct mii_bus *bus, int phy_id,
 	u32 cmd;
 	int rc;
 
+// printk("[ADK]\t\t%s entered\n", __func__);
+
 	rc = iproc_mdio_wait_for_idle(priv->base);
 	if (rc)
 		return rc;
@@ -138,6 +142,8 @@ static int iproc_mdio_probe(struct platform_device *pdev)
 	struct resource *res;
 	int rc;
 
+printk("[ADK] %s entered\n", __func__);
+
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -155,6 +161,8 @@ static int iproc_mdio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+printk("[ADK] %s mii_bus@%p\n", __func__, (void *)priv->mii_bus);
+
 	bus = priv->mii_bus;
 	bus->priv = priv;
 	bus->name = "iProc MDIO bus";
@@ -162,12 +170,14 @@ static int iproc_mdio_probe(struct platform_device *pdev)
 	bus->parent = &pdev->dev;
 	bus->read = iproc_mdio_read;
 	bus->write = iproc_mdio_write;
+	
 
 	rc = of_mdiobus_register(bus, pdev->dev.of_node);
 	if (rc) {
 		dev_err(&pdev->dev, "MDIO bus registration failed\n");
 		goto err_iproc_mdio;
 	}
+	priv->mii_bus->phy_mask = 0xfffffffc;
 
 	platform_set_drvdata(pdev, priv);
 

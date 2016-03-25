@@ -52,6 +52,25 @@ static bool iproc_nand_intc_ack(struct brcmnand_soc *soc)
 	return false;
 }
 
+static u32 iproc_nand_ecc_mips_reg_read(struct brcmnand_soc *soc, u32 offset)
+{
+	struct iproc_nand_soc *priv =
+			container_of(soc, struct iproc_nand_soc, soc);
+	void __iomem *mmio = priv->ext_base + offset;
+	u32 val = brcmnand_readl(mmio);
+
+	return val;
+}
+
+static void iproc_nand_ecc_mips_reg_write(struct brcmnand_soc *soc, u32 offset, u32 value)
+{
+	struct iproc_nand_soc *priv =
+			container_of(soc, struct iproc_nand_soc, soc);
+	void __iomem *mmio = priv->ext_base + offset;
+
+	brcmnand_writel(value, mmio);
+}
+
 static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
 {
 	struct iproc_nand_soc *priv =
@@ -123,6 +142,8 @@ static int iproc_nand_probe(struct platform_device *pdev)
 	soc->ctlrdy_ack = iproc_nand_intc_ack;
 	soc->ctlrdy_set_enabled = iproc_nand_intc_set;
 	soc->prepare_data_bus = iproc_nand_apb_access;
+	soc->read_ecc_mips_reg = iproc_nand_ecc_mips_reg_read;
+	soc->write_ecc_mips_reg = iproc_nand_ecc_mips_reg_write;
 
 	return brcmnand_probe(pdev, soc);
 }

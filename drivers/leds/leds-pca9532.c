@@ -69,6 +69,13 @@ static const struct i2c_device_id pca9532_id[] = {
 	{ }
 };
 
+/*
+static const struct of_device_id cygnus_mach_of_match[] = {
+	{.compatible = "bcm,cygnussvk-machine", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, cygnus_mach_of_match);
+*/ 
 MODULE_DEVICE_TABLE(i2c, pca9532_id);
 
 static const struct pca9532_chip_info pca9532_chip_info_tbl[] = {
@@ -89,6 +96,7 @@ static const struct pca9532_chip_info pca9532_chip_info_tbl[] = {
 static struct i2c_driver pca9532_driver = {
 	.driver = {
 		.name = "leds-pca953x",
+//		.of_match_table = pca953x_of_match,
 	},
 	.probe = pca9532_probe,
 	.remove = pca9532_remove,
@@ -333,6 +341,8 @@ static int pca9532_configure(struct i2c_client *client,
 	int gpios = 0;
 	u8 maxleds = data->chip_info->num_leds;
 
+printk("[ADK] %s entered, addr=0x%x, num_leds=%d\n", __func__, client->addr, data->chip_info->num_leds);
+
 	for (i = 0; i < 2; i++)	{
 		data->pwm[i] = pdata->pwm[i];
 		data->psc[i] = pdata->psc[i];
@@ -355,6 +365,7 @@ static int pca9532_configure(struct i2c_client *client,
 			gpios++;
 			break;
 		case PCA9532_TYPE_LED:
+// printk("[ADK] %s configure led-%d\n", __func__, i);
 			led->state = pled->state;
 			led->name = pled->name;
 			led->ldev.name = led->name;
@@ -436,6 +447,49 @@ exit:
 	return err;
 }
 
+static struct pca9532_platform_data *pca9532_parse_dt(struct device *dev, unsigned short addr)
+{
+	struct device_node *np = dev->of_node;
+	struct pca9532_platform_data *pca9532_pdata;
+	u32 typecodes, statecodes;
+	u32 pwm[2];
+	u32 psc[2];
+	int i;
+
+	pca9532_pdata = devm_kzalloc(dev, sizeof(*pca9532_pdata), GFP_KERNEL);
+	if (!pca9532_pdata)
+		return NULL;
+
+	if (!of_property_read_u32(np, "nxp,typecodes", &typecodes)) {
+		for (i = 0; i < 16; i++) {
+			pca9532_pdata->leds[i].type =
+				(typecodes >> (2 * i)) & 0x3;
+			if (pca9532_pdata->leds[i].type == PCA9532_TYPE_LED) {
+				pca9532_pdata->leds[i].name  = devm_kzalloc(dev, 12, GFP_KERNEL);
+				sprintf(pca9532_pdata->leds[i].name, "led-%d-%d", (addr&0x7), i); 
+			}
+		}
+	}
+	if (!of_property_read_u32(np, "nxp,statecodes", &statecodes)) {
+		for (i = 0; i < 16; i++)
+			pca9532_pdata->leds[i].state =
+				(statecodes >> (2 * i)) & 0x3;
+	}
+	if (!of_property_read_u32_array(np, "nxp,pwm", &pwm[0], 2)) {
+		for (i = 0; i < 2; i++)
+			pca9532_pdata->pwm[i] = pwm[i];
+	}
+	if (!of_property_read_u32_array(np, "nxp,psc", &psc[0], 2)) {
+		for (i = 0; i < 2; i++)
+			pca9532_pdata->psc[i] = psc[i];
+	}
+
+	pca9532_pdata->gpio_base = -1; /* dynamically assign gpio base */
+
+	return pca9532_pdata;
+}
+
+
 static int pca9532_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
@@ -443,8 +497,15 @@ static int pca9532_probe(struct i2c_client *client,
 	struct pca9532_platform_data *pca9532_pdata =
 			dev_get_platdata(&client->dev);
 
+printk("[ADK] %s() entered\n", __func__);
+
+	if (IS_ENABLED(CONFIG_OF) && !pca9532_pdata && client->dev.of_node)
+		pca9532_pdata = pca9532_parse_dt(&client->dev, client->addr);
+
 	if (!pca9532_pdata)
 		return -EIO;
+
+printk("[ADK] %s() DTS parsed OK, check i2c device 0x%x\n", __func__, client->addr);
 
 	if (!i2c_check_functionality(client->adapter,
 		I2C_FUNC_SMBUS_BYTE_DATA))
@@ -454,6 +515,8 @@ static int pca9532_probe(struct i2c_client *client,
 	if (!data)
 		return -ENOMEM;
 
+printk("[ADK] %s() setup pca953x (id=%ld)\n", __func__, id->driver_data);
+
 	data->chip_info = &pca9532_chip_info_tbl[id->driver_data];
 
 	dev_info(&client->dev, "setting platform data\n");
@@ -462,6 +525,8 @@ static int pca9532_probe(struct i2c_client *client,
 	mutex_init(&data->update_lock);
 
 	return pca9532_configure(client, data, pca9532_pdata);
+printk("[ADK] %s() finished OK\n", __func__);
+
 }
 
 static int pca9532_remove(struct i2c_client *client)

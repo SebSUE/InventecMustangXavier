@@ -43,11 +43,16 @@ struct iproc_asiu {
 
 #define to_asiu_clk(hw) container_of(hw, struct iproc_asiu_clk, hw)
 
+static struct iproc_asiu *asiu_dbg;
+
+
 static int iproc_asiu_clk_enable(struct clk_hw *hw)
 {
 	struct iproc_asiu_clk *clk = to_asiu_clk(hw);
 	struct iproc_asiu *asiu = clk->asiu;
 	u32 val;
+
+printk("[ADK] %s entered\n", __func__);
 
 	/* some clocks at the ASIU level are always enabled */
 	if (clk->gate.offset == IPROC_CLK_INVALID_OFFSET)
@@ -55,6 +60,9 @@ static int iproc_asiu_clk_enable(struct clk_hw *hw)
 
 	val = readl(asiu->gate_base + clk->gate.offset);
 	val |= (1 << clk->gate.en_shift);
+
+printk("[ADK] %s set gate to 0x%08x\n", __func__, val);
+
 	writel(val, asiu->gate_base + clk->gate.offset);
 
 	return 0;
@@ -72,6 +80,7 @@ static void iproc_asiu_clk_disable(struct clk_hw *hw)
 
 	val = readl(asiu->gate_base + clk->gate.offset);
 	val &= ~(1 << clk->gate.en_shift);
+printk("[ADK] %s set gate to 0x%08x\n", __func__, val);
 	writel(val, asiu->gate_base + clk->gate.offset);
 }
 
@@ -174,6 +183,12 @@ static int iproc_asiu_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	return 0;
 }
 
+void iproc_asiu_top_show(void)
+{
+	printk("[ADK] %s gate=%08x\n", __func__, readl(asiu_dbg->gate_base));
+
+}
+
 static const struct clk_ops iproc_asiu_ops = {
 	.enable = iproc_asiu_clk_enable,
 	.disable = iproc_asiu_clk_disable,
@@ -251,6 +266,8 @@ void __init iproc_asiu_setup(struct device_node *node,
 	if (WARN_ON(ret))
 		goto err_clk_register;
 
+	asiu_dbg = asiu;
+	
 	return;
 
 err_clk_register:

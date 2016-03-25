@@ -531,6 +531,8 @@ struct regmap *__regmap_init(struct device *dev,
 	enum regmap_endian reg_endian, val_endian;
 	int i, j;
 
+//printk("[ADK] %s entered, cache_type=%d\n", __func__, config->cache_type);
+
 	if (!config)
 		goto err;
 
@@ -615,19 +617,24 @@ struct regmap *__regmap_init(struct device *dev,
 		map->read_flag_mask = bus->read_flag_mask;
 	}
 
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
+
 	if (!bus) {
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		map->reg_read  = config->reg_read;
 		map->reg_write = config->reg_write;
 
 		map->defer_caching = false;
 		goto skip_format_initialization;
 	} else if (!bus->read || !bus->write) {
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		map->reg_read = _regmap_bus_reg_read;
 		map->reg_write = _regmap_bus_reg_write;
 
 		map->defer_caching = false;
 		goto skip_format_initialization;
 	} else {
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		map->reg_read  = _regmap_bus_read;
 		map->reg_update_bits = bus->reg_update_bits;
 	}
@@ -791,9 +798,11 @@ struct regmap *__regmap_init(struct device *dev,
 	}
 
 	if (map->format.format_write) {
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		map->defer_caching = false;
 		map->reg_write = _regmap_bus_formatted_write;
 	} else if (map->format.format_val) {
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		map->defer_caching = true;
 		map->reg_write = _regmap_bus_raw_write;
 	}
@@ -1208,18 +1217,22 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 	size_t len;
 	int i;
 
+//printk("[ADK] %s/enetered, val_len=%d, async=%d\n", __func__, val_len, map->async);
+
 	WARN_ON(!map->bus);
 
 	/* Check for unwritable registers before we start */
-	if (map->writeable_reg)
+	if (map->writeable_reg) {
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		for (i = 0; i < val_len / map->format.val_bytes; i++)
 			if (!map->writeable_reg(map->dev,
 						reg + (i * map->reg_stride)))
 				return -EINVAL;
-
+	}
 	if (!map->cache_bypass && map->format.parse_val) {
 		unsigned int ival;
 		int val_bytes = map->format.val_bytes;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 		for (i = 0; i < val_len / val_bytes; i++) {
 			ival = map->format.parse_val(val + (i * val_bytes));
 			ret = regcache_write(map, reg + (i * map->reg_stride),
@@ -1236,12 +1249,14 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 			return 0;
 		}
 	}
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	range = _regmap_range_lookup(map, reg);
 	if (range) {
 		int val_num = val_len / map->format.val_bytes;
 		int win_offset = (reg - range->range_min) % range->window_len;
 		int win_residue = range->window_len - win_offset;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 		/* If the write goes beyond the end of the window split it */
 		while (val_num > win_residue) {
@@ -1266,6 +1281,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 		if (ret != 0)
 			return ret;
 	}
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	map->format.format_reg(map->work_buf, reg, map->reg_shift);
 
@@ -1317,6 +1333,8 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 		list_add_tail(&async->list, &map->async_list);
 		spin_unlock_irqrestore(&map->async_lock, flags);
 
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
+
 		if (val != work_val)
 			ret = map->bus->async_write(map->bus_context,
 						    async->work_buf,
@@ -1338,9 +1356,12 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 			list_move(&async->list, &map->async_free);
 			spin_unlock_irqrestore(&map->async_lock, flags);
 		}
+//printk("[ADK] %s finished OK\n", __func__);
 
 		return ret;
 	}
+
+//printk("[ADK] %s/%d, bus->write@%p\n", __func__, __LINE__, (void *)map->bus->write);
 
 	trace_regmap_hw_write_start(map, reg, val_len / map->format.val_bytes);
 
@@ -1375,6 +1396,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 	}
 
 	trace_regmap_hw_write_done(map, reg, val_len / map->format.val_bytes);
+//printk("[ADK] %s finished OK\n", __func__);
 
 	return ret;
 }
@@ -1445,6 +1467,7 @@ static int _regmap_bus_reg_write(void *context, unsigned int reg,
 				 unsigned int val)
 {
 	struct regmap *map = context;
+// printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	return map->bus->reg_write(map->bus_context, reg, val);
 }
@@ -1453,6 +1476,8 @@ static int _regmap_bus_raw_write(void *context, unsigned int reg,
 				 unsigned int val)
 {
 	struct regmap *map = context;
+
+//printk("[ADK] %s entered\n", __func__);
 
 	WARN_ON(!map->bus || !map->format.format_val);
 
@@ -1476,6 +1501,8 @@ int _regmap_write(struct regmap *map, unsigned int reg,
 	int ret;
 	void *context = _regmap_map_get_context(map);
 
+//printk("[ADK] %s entered, reg=%d, val=0x%x\n", __func__, reg, val);
+
 	if (!regmap_writeable(map, reg))
 		return -EIO;
 
@@ -1495,6 +1522,8 @@ int _regmap_write(struct regmap *map, unsigned int reg,
 #endif
 
 	trace_regmap_reg_write(map, reg, val);
+
+//printk("[ADK] %s reg_write@%p\n", __func__, (void *)map->reg_write);
 
 	return map->reg_write(context, reg, val);
 }
@@ -1835,6 +1864,7 @@ static int _regmap_raw_multi_reg_write(struct regmap *map,
 	size_t pad_bytes = map->format.pad_bytes;
 	size_t pair_size = reg_bytes + pad_bytes + val_bytes;
 	size_t len = pair_size * num_regs;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	if (!len)
 		return -EINVAL;
@@ -1888,6 +1918,8 @@ static int _regmap_range_multi_paged_reg_write(struct regmap *map,
 	struct reg_sequence *base;
 	unsigned int this_page = 0;
 	unsigned int page_change = 0;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
+
 	/*
 	 * the set of registers are not neccessarily in order, but
 	 * since the order of write must be preserved this algorithm
@@ -1962,6 +1994,7 @@ static int _regmap_multi_reg_write(struct regmap *map,
 {
 	int i;
 	int ret;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	if (!map->can_multi_write) {
 		for (i = 0; i < num_regs; i++) {
@@ -2054,6 +2087,7 @@ int regmap_multi_reg_write(struct regmap *map, const struct reg_sequence *regs,
 			   int num_regs)
 {
 	int ret;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	map->lock(map->lock_arg);
 
@@ -2088,6 +2122,7 @@ int regmap_multi_reg_write_bypassed(struct regmap *map,
 {
 	int ret;
 	bool bypass;
+//printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	map->lock(map->lock_arg);
 
@@ -2519,21 +2554,45 @@ static int _regmap_update_bits(struct regmap *map, unsigned int reg,
 {
 	int ret;
 	unsigned int tmp, orig;
-
+/*
+if (reg == 102) {
+	printk("[ADK]\t\t%s entered, map@%p, reg=%d, mask=0x%x, val=0x%x\n", __func__, map, reg, mask, val);
+}
+*/
 	if (change)
 		*change = false;
 
 	if (regmap_volatile(map, reg) && map->reg_update_bits) {
+/*
+if (reg == 102) {
+	printk("[ADK]\t\t%s/%d\n", __func__, __LINE__);
+}
+*/
 		ret = map->reg_update_bits(map->bus_context, reg, mask, val);
 		if (ret == 0 && change)
 			*change = true;
 	} else {
+/*
+if (reg == 102) {
+	printk("[ADK]\t\t%s/%d\n", __func__, __LINE__);
+}
+*/
 		ret = _regmap_read(map, reg, &orig);
 		if (ret != 0)
 			return ret;
+/*
+if (reg == 102) {
+	printk("[ADK]\t\t%s/%d, orig=0x%x\n", __func__, __LINE__, orig);
+}
+*/
 
 		tmp = orig & ~mask;
 		tmp |= val & mask;
+/*
+if (reg == 102) {
+	printk("[ADK]\t\t%s/%d, tmp=0x%x\n", __func__, __LINE__, tmp);
+}
+*/
 
 		if (force_write || (tmp != orig)) {
 			ret = _regmap_write(map, reg, tmp);
@@ -2541,7 +2600,11 @@ static int _regmap_update_bits(struct regmap *map, unsigned int reg,
 				*change = true;
 		}
 	}
-
+/*
+if (reg == 102) {
+	printk("[ADK]\t\t%s finished\n", __func__);
+}
+*/
 	return ret;
 }
 

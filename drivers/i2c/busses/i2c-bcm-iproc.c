@@ -114,6 +114,7 @@ static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
 
 	writel(status, iproc_i2c->base + IS_OFFSET);
 	iproc_i2c->xfer_is_done = 1;
+// printk("!\n");	
 	complete_all(&iproc_i2c->done);
 
 	return IRQ_HANDLED;
@@ -130,6 +131,8 @@ static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *iproc_i2c,
 	switch (val) {
 	case M_CMD_STATUS_SUCCESS:
 		return 0;
+
+printk("[ADK] %s/%d: ERROR %x\n", __func__, __LINE__, val);
 
 	case M_CMD_STATUS_LOST_ARB:
 		dev_dbg(iproc_i2c->device, "lost bus arbitration\n");
@@ -157,9 +160,16 @@ static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
 					 struct i2c_msg *msg)
 {
 	int ret, i;
-	u8 addr;
+	u8 addr;  
 	u32 val;
 	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
+
+
+	printk("[ADK]\t\t%s I2C-%x: %s(%d)", __func__, msg->addr, ((msg->flags & I2C_M_RD)? "read" : "write"), msg->len);
+	if ((!(msg->flags & I2C_M_RD)) && msg->len > 1) {
+		printk(": [% 3d:=%02x]", msg->buf[0], msg->buf[1]);
+	}
+	printk("\n");
 
 	/* check if bus is busy */
 	if (!!(readl(iproc_i2c->base + M_CMD_OFFSET) &
@@ -257,6 +267,8 @@ static int bcm_iproc_i2c_xfer(struct i2c_adapter *adapter,
 {
 	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adapter);
 	int ret, i;
+
+//printk("[ADK] %s entered dev@%p, num=%d\n", __func__, (void *)iproc_i2c, num);
 
 	/* go through all messages */
 	for (i = 0; i < num; i++) {

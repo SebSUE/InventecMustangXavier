@@ -1,0 +1,16 @@
+#
+# Broadcom AMAC Network configuration
+#
+
+config NET_BCM_AMAC
+	tristate "Broadcom AMAC Gigabit Ethernet support"
+	depends on MDIO_BCM_IPROC && BCM_CYGNUS_PHY
+	default n
+	---help---
+	  This driver supports the on-chip AMAC Ethernet device of the Cygnus chip.
+	  The driver uses the BCM_CYGNUS_PHY driver for the Ethernet PHY. It also
+	  performs the on-chip SF2 Switch initialization. The driver also supports the
+	  switch by-pass mode which is configurable using the device tree.
+
+	  To compile this driver as a module, choose M here. If unsure, say N.
+

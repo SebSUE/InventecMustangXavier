@@ -100,6 +100,8 @@ int regcache_init(struct regmap *map, const struct regmap_config *config)
 	int i;
 	void *tmp_buf;
 
+// printk("[ADK] %s entered, cache_type=%d\n", __func__, config->cache_type);
+
 	for (i = 0; i < config->num_reg_defaults; i++)
 		if (config->reg_defaults[i].reg % map->reg_stride)
 			return -EINVAL;
@@ -124,6 +126,8 @@ int regcache_init(struct regmap *map, const struct regmap_config *config)
 	map->reg_defaults_raw = config->reg_defaults_raw;
 	map->cache_word_size = DIV_ROUND_UP(config->val_bits, 8);
 	map->cache_size_raw = map->cache_word_size * config->num_reg_defaults_raw;
+
+// printk("[ADK] %s/%d: i=%d\n", __func__, __LINE__, i);
 
 	map->cache = NULL;
 	map->cache_ops = cache_types[i];
@@ -238,6 +242,8 @@ int regcache_read(struct regmap *map,
 int regcache_write(struct regmap *map,
 		   unsigned int reg, unsigned int value)
 {
+//printk("[ADK] %s entered cache_type=%d\n", __func__, map->cache_type);
+
 	if (map->cache_type == REGCACHE_NONE)
 		return 0;
 
@@ -245,6 +251,8 @@ int regcache_write(struct regmap *map,
 
 	if (!regmap_volatile(map, reg))
 		return map->cache_ops->write(map, reg, value);
+
+// printk("[ADK] %s/%d\n", __func__, __LINE__);
 
 	return 0;
 }

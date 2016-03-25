@@ -2220,6 +2220,9 @@ static int snd_soc_xlate_tdm_slot_mask(unsigned int slots,
 int snd_soc_dai_set_tdm_slot(struct snd_soc_dai *dai,
 	unsigned int tx_mask, unsigned int rx_mask, int slots, int slot_width)
 {
+
+	printk("[ADK] %s entered\n", __func__);
+
 	if (dai->driver && dai->driver->ops->xlate_tdm_slot_mask)
 		dai->driver->ops->xlate_tdm_slot_mask(slots,
 						&tx_mask, &rx_mask);
@@ -2304,6 +2307,7 @@ EXPORT_SYMBOL_GPL(snd_soc_dai_digital_mute);
 static int snd_soc_init_multicodec(struct snd_soc_card *card,
 				   struct snd_soc_dai_link *dai_link)
 {
+
 	/* Legacy codec/codec_dai link is a single entry in multicodec */
 	if (dai_link->codec_name || dai_link->codec_of_node ||
 	    dai_link->codec_dai_name) {
@@ -3062,6 +3066,8 @@ int snd_soc_register_codec(struct device *dev,
 	if (codec == NULL)
 		return -ENOMEM;
 
+	printk("[ADK] %s: codec register [%s]@%p\n", __func__, dev_name(dev), codec);
+
 	codec->component.codec = codec;
 
 	ret = snd_soc_component_initialize(&codec->component,
@@ -3141,6 +3147,34 @@ err_free:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(snd_soc_register_codec);
+
+typedef int (*_codec_fn)(struct snd_soc_codec *c, void *todo);
+
+int snd_soc_for_every_codec(_codec_fn _fn, void *todo)
+{
+	struct snd_soc_codec *codec;
+	
+	list_for_each_entry(codec, &codec_list, list) {
+		_fn(codec, todo);	
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL_GPL(snd_soc_for_every_codec);
+
+typedef int (*_component_fn)(struct snd_soc_dai *dai, void *todo);
+
+int snd_soc_for_every_dai(struct snd_soc_component *component, _component_fn _fn, void *todo)
+{
+	struct snd_soc_dai *dai;
+
+	list_for_each_entry(dai, &component->dai_list, list) {
+		_fn(dai, todo);	
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_for_every_dai);
+
 
 /**
  * snd_soc_unregister_codec - Unregister a codec from the ASoC core

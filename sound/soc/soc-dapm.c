@@ -157,6 +157,34 @@ static void pop_dbg(struct device *dev, u32 pop_time, const char *fmt, ...)
 	kfree(buf);
 }
 
+enum cygnussvk_dai_fn_code {
+	DAI_SET_SYSCLK,
+	DAI_SET_FMT,
+	DAI_SET_HW,
+	DAI_PREPARE,
+	CODEC_POWER_MNG,
+	DAPM_STREAM_EVENT,
+};
+
+
+#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+
+	struct cygnussvk_dai_fn {
+	enum cygnussvk_dai_fn_code  fn;	// what we need to do ..
+	unsigned int  args[8];  // arguments ..  
+};
+
+typedef int (*cygnussvk_codec_fn)(struct snd_soc_codec *c, struct cygnussvk_dai_fn *d);
+int snd_soc_for_every_codec(cygnussvk_codec_fn, struct cygnussvk_dai_fn *todo);
+int codec_fn(struct snd_soc_codec *codec, struct cygnussvk_dai_fn *todo);
+
+int snd_soc_get_chnls(void);
+int aic3x_get_id(struct snd_soc_codec *codec);
+
+#endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+
+
+
 static bool dapm_dirty_widget(struct snd_soc_dapm_widget *w)
 {
 	return !list_empty(&w->dirty);
@@ -567,6 +595,15 @@ static int soc_dapm_read(struct snd_soc_dapm_context *dapm, int reg,
 static int soc_dapm_update_bits(struct snd_soc_dapm_context *dapm,
 	int reg, unsigned int mask, unsigned int value)
 {
+
+if (reg == 19 || reg == 22) {
+	printk("[ADK] %s eneterd, reg=%d\n", __func__, reg);
+/*
+	dump_stack();
+	printk("[ADK] %s ===========\n", __func__);
+*/	
+}
+
 	if (!dapm->component)
 		return -EIO;
 	return snd_soc_component_update_bits(dapm->component, reg,
@@ -1435,12 +1472,35 @@ static void dapm_seq_run_coalesced(struct snd_soc_card *card,
 		/* Any widget will do, they should all be updating the
 		 * same register.
 		 */
+		 
+		struct snd_soc_codec *codec = snd_soc_dapm_to_codec(dapm);
+		
+		
+#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+		printk("[ADK]\t%s update reg=%d, codec=[%s], id=%d, chnls=%d\n", __func__, reg, codec->component.name, aic3x_get_id(codec), snd_soc_get_chnls());
+#endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
 
 		pop_dbg(dapm->dev, card->pop_time,
 			"pop test : Applying 0x%x/0x%x to %x in %dms\n",
 			value, mask, reg, card->pop_time);
 		pop_wait(card->pop_time);
 		soc_dapm_update_bits(dapm, reg, mask, value);
+
+#ifdef CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
+
+		if (aic3x_get_id(codec) == 0) {
+			if (snd_soc_get_chnls() == 8) {
+				cygnussvk_codec_fn _fn = codec_fn;
+				struct cygnussvk_dai_fn todo;
+			
+				todo.fn = DAPM_STREAM_EVENT;
+				todo.args[0] = reg;
+				todo.args[1] =mask;
+				todo.args[2] =value;
+				snd_soc_for_every_codec(_fn, &todo);
+			}
+		}
+#endif // CONFIG_SND_SOC_CYGNUS_SVK_MACHINE
 	}
 
 	list_for_each_entry(w, pending, power_list) {
@@ -1567,6 +1627,7 @@ static void dapm_widget_update(struct snd_soc_card *card)
 	unsigned int wi;
 	int ret;
 
+// printk("[ADK]\t%s entered\n", __func__);
 	if (!update || !dapm_kcontrol_is_powered(update->kcontrol))
 		return;
 
@@ -1586,6 +1647,8 @@ static void dapm_widget_update(struct snd_soc_card *card)
 	if (!w)
 		return;
 
+// printk("[ADK]\t%s widget=[%s], update reg=%d\n", __func__, w->name, update->reg);
+
 	ret = soc_dapm_update_bits(w->dapm, update->reg, update->mask,
 		update->val);
 	if (ret < 0)
@@ -1602,6 +1665,7 @@ static void dapm_widget_update(struct snd_soc_card *card)
 					   w->name, ret);
 		}
 	}
+// printk("[ADK]\t%s finished\n", __func__);
 }
 
 /* Async callback run prior to DAPM sequences - brings to _PREPARE if
@@ -1777,6 +1841,8 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	ASYNC_DOMAIN_EXCLUSIVE(async_domain);
 	enum snd_soc_bias_level bias;
 
+// printk("[ADK] %s entered, event=%d\n", __func__, event);
+
 	lockdep_assert_held(&card->dapm_mutex);
 
 	trace_snd_soc_dapm_start(card);
@@ -1843,6 +1909,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	/* Force all contexts in the card to the same bias state if
 	 * they're not ground referenced.
 	 */
+
 	bias = SND_SOC_BIAS_OFF;
 	list_for_each_entry(d, &card->dapm_list, list)
 		if (d->target_bias_level > bias)
@@ -1874,6 +1941,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	/* Power down widgets first; try to avoid amplifying pops. */
 	dapm_seq_run(card, &down_list, event, false);
 
+
 	dapm_widget_update(card);
 
 	/* Now power up. */
@@ -1895,11 +1963,16 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 			d->stream_event(d, event);
 	}
 
+
 	pop_dbg(card->dev, card->pop_time,
 		"DAPM sequencing finished, waiting %dms\n", card->pop_time);
 	pop_wait(card->pop_time);
 
 	trace_snd_soc_dapm_done(card);
+/*
+if (event)
+	printk("[ADK] %s finished\n", __func__);
+*/	
 
 	return 0;
 }
@@ -3952,6 +4025,8 @@ void snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 			      int event)
 {
 	struct snd_soc_card *card = rtd->card;
+
+printk("[ADK] %s entered, stream=%d, event=%d\n", __func__, stream, event);
 
 	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
 	soc_dapm_stream_event(rtd, stream, event);
