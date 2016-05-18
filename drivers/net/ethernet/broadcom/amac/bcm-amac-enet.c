@@ -226,9 +226,14 @@ static int bcm_amac_enet_start(struct bcm_amac_priv *privp)
 		dev_err(&privp->pdev->dev, "%s: PHY Init failed\n", __func__);
 		return rc;
 	}
-
 	/* parse cmd line and set mac address */
 	amac_enet_parse_mac_addr(cmdline_params.mac_addr, parsed_mac.sa_data);
+	if (!is_valid_ether_addr(parsed_mac.sa_data)) {
+		dev_err(&privp->pdev->dev,
+			"bcm-amac: Invalid ethaddr - %s\n",
+			cmdline_params.mac_addr);
+		return rc;
+	}
 	amac_enet_set_mac(privp->ndev, (void *)&parsed_mac);
 
 	/* Register GMAC Interrupt */
@@ -626,14 +631,8 @@ static int __init bcm_amac_setup_ethaddr(char *s)
 		return 0;
 	}
 
-	rc = is_valid_ether_addr(s);
-	if (rc) {
-		pr_info("bcm-amac: setting ethaddr: %s\n", s);
-		strcpy(cmdline_params.mac_addr, s);
-	} else {
-		pr_err("bcm-amac: Invalid ethaddr - %s\n", s);
-		return 0;
-	}
+        pr_info("bcm-amac: setting ethaddr: %s\n", s);
+        strcpy(cmdline_params.mac_addr, s);
 
 	return 1;
 }
