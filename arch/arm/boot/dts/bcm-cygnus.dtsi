@@ -426,6 +426,16 @@
 			#dma-cells = <1>;
 		};
 
+	crmu_pwr_good: syscon@0x0301c02c {
+		compatible = "syscon";
+		reg = < 0x0301c02c 0x14>;
+	};
+
+	bbl_auth: syscon@03024c74 {
+		compatible = "syscon";
+		reg = <0x03024c74 0x20>;
+	};
+
 	bluetooth {
 		compatible = "brcm,bcmbt-rfkill";
 		num-rf-regs = <3>;

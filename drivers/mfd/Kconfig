@@ -90,6 +90,20 @@ config MFD_BCM590XX
 	help
 	  Support for the BCM590xx PMUs from Broadcom
 
+config BCM_IPROC_BBL
+	tristate "IPROC BBL support"
+	depends on ARCH_BCM_IPROC || COMPILE_TEST
+	depends on MFD_SYSCON
+	default ARCH_BCM_CYGNUS
+	help
+	  This driver provides support for BBL tamper enable
+	  and disable. This will detect any tamper on the board.
+	  Any tamper once detected cannot be cleared and no new
+	  tamper can be detected further. This also enables the
+	  RTC periodic support.
+
+	  If unsure, say N.
+
 config MFD_AXP20X
 	bool "X-Powers AXP20X"
 	select MFD_CORE
