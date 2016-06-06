@@ -48,6 +48,18 @@
 		stdout-path = "serial0:115200n8";
 	};
 
+	bbl: iproc_bbl@0x03026000 {
+		rtc-enable;
+		tamper-enable;
+		compatible = "brcm,iproc-bbl";
+		reg = <0x03026000 0x10>;
+		crmu_pwr_good_syscon = <&crmu_pwr_good>;
+		bbl_auth_syscon = <&bbl_auth>;
+		interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+		<GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
+		status = "okay";
+	};
+
 	sound {
 /*		compatible = "bcm,cygnussvk-machine";     */
 		compatible = "bcm,cygnus-hoka-machine";
