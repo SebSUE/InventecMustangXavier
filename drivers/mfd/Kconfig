@@ -94,6 +94,7 @@ config BCM_IPROC_BBL
 	tristate "IPROC BBL support"
 	depends on ARCH_BCM_IPROC || COMPILE_TEST
 	depends on MFD_SYSCON
+	depends on RTC_CLASS
 	default ARCH_BCM_CYGNUS
 	help
 	  This driver provides support for BBL tamper enable

@@ -29,6 +29,7 @@
 #include <linux/bitops.h>
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
+#include <linux/miscdevice.h>
 
 /*
  * High and Low temperature set for
@@ -258,6 +259,25 @@
 
 /* Time to wait for BBL done status */
 #define BBL_STATUS_TIMEOUT 1000
+
+/* SFU update functionality */
+#define SFUPDATE (1)
+
+#if SFUPDATE
+#define SFUPDATE_REG BBL_SEC0_MEM  /* secmem register used to store info*/
+#define SFUPDATE_CNT_MASK (0x3fffffff)
+#define SFUPDATE_CNT_SHIFT (0)
+#define SFUPDATE_CNT_GET(x) (((x) & SFUPDATE_CNT_MASK) >> SFUPDATE_CNT_SHIFT)
+#define SFUPDATE_CNT_SET(val, reg) ((reg & ~SFUPDATE_CNT_MASK) | (val << SFUPDATE_CNT_SHIFT))
+#define SFUPDATE_FAIL_MASK (0x40000000)
+#define SFUPDATE_FAIL_SHIFT (30)
+#define SFUPDATE_FAIL_GET(x) (((x) & SFUPDATE_FAIL_MASK) >> SFUPDATE_FAIL_SHIFT)
+#define SFUPDATE_FAIL_SET(val, reg) ((reg & ~SFUPDATE_FAIL_MASK) | (val << SFUPDATE_FAIL_SHIFT))
+#define SFUPDATE_UPDATE_MASK (0x80000000)
+#define SFUPDATE_UPDATE_SHIFT (31)
+#define SFUPDATE_UPDATE_GET(x) (((x) & SFUPDATE_UPDATE_MASK) >> SFUPDATE_UPDATE_SHIFT)
+#define SFUPDATE_UPDATE_SET(val, reg) ((reg & ~SFUPDATE_UPDATE_MASK) | (val << SFUPDATE_UPDATE_SHIFT))
+#endif
 
 struct bbl_regs {
 	u32 REG_SPRU_BBL_WDATA;
@@ -1392,6 +1412,147 @@ err:
 }
 static DEVICE_ATTR(bbl_fmon_en_dis, (S_IWUSR|S_IWGRP), NULL, store_fmon);
 
+#if SFUPDATE
+
+static unsigned int sfupdate_read_reg(struct device *dev) {
+
+	struct bcm_iproc_bbl *iproc_bbl;
+	unsigned int data = 0;
+	int ret = -1;
+
+	iproc_bbl = dev_get_drvdata(dev);
+	if (NULL == iproc_bbl) {
+		pr_err("Get iproc_bbl faield!\n");
+		return 0;
+	}
+	ret = bbl_reg_read(SFUPDATE_REG, &data, iproc_bbl);
+	if (ret < 0) {
+		pr_err("Get reg failed!\n");
+		return 0;
+	}
+	return data;
+}
+
+static int sfupdate_write_reg(struct device *dev, unsigned int val) {
+
+	struct bcm_iproc_bbl *iproc_bbl;
+	int ret;
+
+	iproc_bbl = dev_get_drvdata(dev);
+	if (NULL == iproc_bbl) {
+		pr_err("Get iproc_bbl faield!\n");
+		return 0;
+	}
+
+	ret = bbl_reg_write(SFUPDATE_REG, val, iproc_bbl);
+	if (ret < 0) {
+		pr_err("BBL Secure Memory write of value :%x to address 0x%x failed\n",
+			val, SFUPDATE_REG);
+	}
+	return ret;
+}
+
+/* Counter file */
+static ssize_t counter_show(struct device *dev,
+		 struct device_attribute *attr,
+		 char *buf)
+{
+	unsigned int data;
+	ssize_t ret;
+	data = sfupdate_read_reg(dev);
+	ret = sprintf(buf, "%u", SFUPDATE_CNT_GET(data));
+	return ret;
+}
+
+static ssize_t counter_store(struct device *d,
+		 struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int val;
+	unsigned int reg;
+	sscanf(buf, "%d", &val);
+	// todo: CHECK VAL
+	// todo: LOCK
+	reg = sfupdate_read_reg(d);
+	sfupdate_write_reg(d, SFUPDATE_CNT_SET(val, reg));
+	// todo : UNLOCK
+	return strnlen(buf, count);
+}
+
+static DEVICE_ATTR(counter, (S_IWUSR | S_IRUGO), counter_show, counter_store);
+
+/* Fail file */
+static ssize_t fail_show(struct device *dev,
+		 struct device_attribute *attr,
+		 char *buf)
+{
+	unsigned int data;
+	ssize_t ret;
+	data = sfupdate_read_reg(dev);
+	ret = sprintf(buf, "%u", SFUPDATE_FAIL_GET(data));
+	return ret;
+}
+
+static ssize_t fail_store(struct device *d,
+		 struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int val;
+	unsigned int reg;
+	sscanf(buf, "%d", &val);
+	//todo: CHECK VAL
+	//todo: LOCK
+	reg = sfupdate_read_reg(d);
+	sfupdate_write_reg(d, SFUPDATE_FAIL_SET(val, reg));
+	//todo: UNLOCK
+	return strnlen(buf, count);
+}
+
+static DEVICE_ATTR(fail, (S_IWUSR | S_IRUGO), fail_show, fail_store);
+
+/* Fail file */
+static ssize_t update_show(struct device *dev,
+		 struct device_attribute *attr,
+		 char *buf)
+{
+	unsigned int data;
+	ssize_t ret;
+	data = sfupdate_read_reg(dev);
+	ret = sprintf(buf, "%u", SFUPDATE_UPDATE_GET(data));
+	return ret;
+}
+
+static ssize_t update_store(struct device *d,
+		 struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int val;
+	unsigned int reg;
+	sscanf(buf, "%d", &val);
+	//todo: CHECK VAL
+	//todo: LOCK
+	reg = sfupdate_read_reg(d);
+	sfupdate_write_reg(d, SFUPDATE_UPDATE_SET(val, reg));
+	//todo: UNLOCK
+	return strnlen(buf, count);
+}
+
+static DEVICE_ATTR(update, (S_IWUSR | S_IRUGO), update_show, update_store);
+static struct attribute *sfupdate_dev_attrs[] = {
+	&dev_attr_counter.attr,
+	&dev_attr_fail.attr,
+	&dev_attr_update.attr,
+	NULL
+};
+
+ATTRIBUTE_GROUPS(sfupdate_dev);
+
+static struct miscdevice sfupdate_dev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "sfupdate",
+	.fops = NULL,
+
+	.groups = sfupdate_dev_groups
+};
+#endif
+
 static int bbl_init(struct bcm_iproc_bbl *iproc_bbl)
 {
 	int ret;
@@ -1585,8 +1746,7 @@ static int iproc_bbl_probe(struct platform_device *pdev)
 	u32 data;
 	int ret;
 
-	iproc_bbl = devm_kzalloc(&pdev->dev, sizeof(*iproc_bbl),
-		GFP_KERNEL);
+	iproc_bbl = kzalloc(sizeof(*iproc_bbl), GFP_KERNEL);
 	spin_lock_init(&iproc_bbl->lock);
 
 	iproc_bbl->dev = &pdev->dev;
@@ -1697,6 +1857,18 @@ static int iproc_bbl_probe(struct platform_device *pdev)
 		}
 		device_init_wakeup(&pdev->dev, 1);
 	}
+#if SFUPDATE
+	if (iproc_bbl->tamper_enable) {
+		ret = misc_register(&sfupdate_dev);
+		/* Store iproc_bbl for misc driver */
+		dev_set_drvdata(sfupdate_dev.this_device, iproc_bbl);
+		if (ret) {
+			printk(KERN_ERR
+				"Unable to register \"sfupdate\" misc device\n");
+			goto fail_sysfs;
+		}
+	}
+#endif
 
 	return 0;
 fail_sysfs:
@@ -1719,8 +1891,12 @@ static int iproc_bbl_remove(struct platform_device *pdev)
 	struct bcm_iproc_bbl *iproc_bbl;
 	iproc_bbl = platform_get_drvdata(pdev);
 
-	if (iproc_bbl->tamper_enable)
+	if (iproc_bbl->tamper_enable) {
+#if SFUPDATE
+		misc_deregister(&sfupdate_dev);
+#endif
 		sysfs_remove_group(&pdev->dev.kobj, &bbl_attr_group);
+	}
 	if (iproc_bbl->rtc_enable) {
 		device_init_wakeup(&pdev->dev, 0);
 		ret = iproc_rtc_disable(iproc_bbl);
@@ -1729,6 +1905,7 @@ static int iproc_bbl_remove(struct platform_device *pdev)
 		rtc_device_unregister(iproc_bbl->rtc);
 	}
 	bbl_exit(iproc_bbl);
+	kfree(iproc_bbl);
 	return 0;
 }
 

@@ -221,4 +221,9 @@
 		status = "okay";
 };
 
+&bbl {
+	rtc-enable;
+	tamper-enable;
+	status = "okay";
+};
 
