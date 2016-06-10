@@ -426,23 +426,32 @@
 			#dma-cells = <1>;
 		};
 
-	crmu_pwr_good: syscon@0x0301c02c {
-		compatible = "syscon";
-		reg = < 0x0301c02c 0x14>;
-	};
+		crmu_pwr_good: syscon@0x0301c02c {
+			compatible = "syscon";
+			reg = < 0x0301c02c 0x14>;
+		};
 
-	bbl_auth: syscon@03024c74 {
-		compatible = "syscon";
-		reg = <0x03024c74 0x20>;
-	};
+		bbl_auth: syscon@03024c74 {
+			compatible = "syscon";
+			reg = <0x03024c74 0x20>;
+		};
 
-	bluetooth {
-		compatible = "brcm,bcmbt-rfkill";
-		num-rf-regs = <3>;
-		bt-dev-wake-gpio = <&gpio_crmu 3 0>;
-		bt-host-wake-gpio = <&gpio_crmu 5 0>;
-	};
-		
+		bluetooth {
+			compatible = "brcm,bcmbt-rfkill";
+			num-rf-regs = <3>;
+			bt-dev-wake-gpio = <&gpio_crmu 3 0>;
+			bt-host-wake-gpio = <&gpio_crmu 5 0>;
+		};
+
+		bbl: iproc_bbl@0x03026000 {
+			compatible = "brcm,iproc-bbl";
+			reg = <0x03026000 0x10>;
+			crmu_pwr_good_syscon = <&crmu_pwr_good>;
+			bbl_auth_syscon = <&bbl_auth>;
+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+			<GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
+		};
 /*----------------------------------------*/
 	};
 };

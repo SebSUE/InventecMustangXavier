@@ -76,7 +76,6 @@
 		bcm,cygnus-link3-mode = "tdm";
 		bcm,cygnus-link3-slave = <1>;
 		bcm,cygnus-link3-frame-width = <128>;
-
 		status = "okay";
 
 	};
@@ -186,4 +185,9 @@
 		status = "okay";
 };
 
+&bbl {
+	rtc-enable;
+	tamper-enable;
+	status = "okay";
+};
 
