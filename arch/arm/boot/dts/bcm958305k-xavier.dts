@@ -106,7 +106,7 @@
 };
 
 &i2c0 {
-	clock-frequency = <100000>;
+	clock-frequency = <400000>;
 	status = "okay";
 		pca9532_1: pca9532@60 {
 			compatible = "nxp,pca9532";
