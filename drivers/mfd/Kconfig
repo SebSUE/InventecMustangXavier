@@ -1507,6 +1507,15 @@ config MFD_STW481X
 	  in various ST Microelectronics and ST-Ericsson embedded
 	  Nomadik series.
 
+config MFD_XAVIER
+	tristate "Support for Xavier board functionnality"
+	select MFD_CORE
+	depends on I2C
+	help
+	  Select this option to enable the xavier board driver. This
+	  mfd allow functionnality link to the touch and led interface
+	  of the xavier board.
+
 menu "Multimedia Capabilities Port drivers"
 	depends on ARCH_SA1100
 
