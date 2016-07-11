@@ -250,13 +250,15 @@ static ssize_t xavier_value_store(struct device *dev,
     msg += buf[0] << 4; /*3 bits for control idx (0) then 1 bit for the value */
     xavier_dev->touch_ena = temp;
     ret = xavier_dev->write_dev(xavier_dev, 1, &msg, 0);
-    if (ret < 0)
+    if (ret < 0) {
       ret = -EIO;
-    printk(KERN_INFO "Xavier : %s - Failed to write to the device\n",
-	   __func__);
-    goto error;
+      printk(KERN_INFO "Xavier : %s - Failed to write to the device\n",
+	           __func__);
+      goto error;
+    }
   }
 
+  return count;
  error:
   return ret;
 }
