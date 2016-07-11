@@ -1,0 +1,79 @@
+Upon boot, the mfd "xavier-i2c" will init automatically and start both led drivers and touch drivers.
+By default led and touch are enabled.
+
+Once linux is fully booted sysfs file can be accessed in the following folder :
+
+/sys/devices/platform/axi/18008000.i2c/i2c-0/0-001c
+
+The various sysfs can then be written into, for example to disable the led :
+
+$echo 0 > LED_ena
+
+and to see the current state of the led :
+
+$cat LED_ena
+
+The following file are present :
+
+LED_ena                 enable (1) or disable (0) the LED functionalities
+available_state         printout the current animation loaded in the MCU
+boot                    give the current boot state of the MCU
+cur_state               allow to start or stop led animations
+error_code              store error_code return by the MCU
+flash                   allow to flash the firmware of the MCU 
+ledctl                  enable or disable the manual control of the LED
+reset                   hardware reset the MCU
+reset_cause             store the last reset cause of the MCU 
+send_state              send animation file to the MCU
+touch_ena               enable or disable touch functionnalities
+version                 printout the MCU firmware version.
+ 
+To upload a new firmware you need to place the touch_firmware.bin file into /etc/firmware/ 
+then write 1 into the flash file :
+
+$echo 1 > flash
+
+The firmware will be uploaded and the MCU will reset at the end of the procedure to boot on the new firmware.
+
+To upload animation on the MCU a binary file is necessary example of hex file representing animation can be found 
+in the documentation folder.
+Those files can be transformed into binary with the linux command :
+
+xxd -r -p flashanim > flashanim.bin 
+
+The binary file can then be uploaded to the MCU with the send_state file :
+
+$cat flashanim.bin > send_state
+
+Warning ! Uploading flash animation will erase all RAM animation currently present in the MCU.
+
+
+To play animation , the cur_state file is used, three command are available for the animations : 
+
+$echo PLAY 1 5 > cur_state 
+
+This command will play the RAM animation 1, five times.
+To loop indefinitely the animation replaces 5 by 0.
+
+
+$echo PLAY_MONO 1 10 0 31 5 > cur_state
+
+This command will play the FLASH animation 1, five times with an RGB color of 10(R) 0(G) 31(B)
+The color can also be written as an hexadecimal value so the following command is also possible: 
+
+$echo PLAY_MONO 1 0x281F 5 > cur_state
+
+the hexadecimal value is read as follows (from MSB to LSB) : 1 bit ignored, 5 bits for the red value, 5 bits for the green value 
+and 5 bits for the blue value.
+
+Finally, you can stop the leds animation with :
+
+$ echo STOP > cur_state
+
+To control the LED manually you need first to set ledctl to 0 :
+
+$echo 0 > ledctl
+
+then you can input a binary with the value of the 12 LEDS (some example of red, green and blue can be found in the documentation folder) :
+
+$cat redlight.bin > send_state
