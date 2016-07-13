@@ -268,15 +268,15 @@
 #define SFUPDATE_CNT_MASK (0x3fffffff)
 #define SFUPDATE_CNT_SHIFT (0)
 #define SFUPDATE_CNT_GET(x) (((x) & SFUPDATE_CNT_MASK) >> SFUPDATE_CNT_SHIFT)
-#define SFUPDATE_CNT_SET(val, reg) ((reg & ~SFUPDATE_CNT_MASK) | (val << SFUPDATE_CNT_SHIFT))
+#define SFUPDATE_CNT_SET(val, reg) ((reg & ~SFUPDATE_CNT_MASK) | ((val << SFUPDATE_CNT_SHIFT) & SFUPDATE_CNT_MASK))
 #define SFUPDATE_FAIL_MASK (0x40000000)
 #define SFUPDATE_FAIL_SHIFT (30)
 #define SFUPDATE_FAIL_GET(x) (((x) & SFUPDATE_FAIL_MASK) >> SFUPDATE_FAIL_SHIFT)
-#define SFUPDATE_FAIL_SET(val, reg) ((reg & ~SFUPDATE_FAIL_MASK) | (val << SFUPDATE_FAIL_SHIFT))
+#define SFUPDATE_FAIL_SET(val, reg) ((reg & ~SFUPDATE_FAIL_MASK) | ((val << SFUPDATE_FAIL_SHIFT) & SFUPDATE_FAIL_MASK))
 #define SFUPDATE_UPDATE_MASK (0x80000000)
 #define SFUPDATE_UPDATE_SHIFT (31)
 #define SFUPDATE_UPDATE_GET(x) (((x) & SFUPDATE_UPDATE_MASK) >> SFUPDATE_UPDATE_SHIFT)
-#define SFUPDATE_UPDATE_SET(val, reg) ((reg & ~SFUPDATE_UPDATE_MASK) | (val << SFUPDATE_UPDATE_SHIFT))
+#define SFUPDATE_UPDATE_SET(val, reg) ((reg & ~SFUPDATE_UPDATE_MASK) | ((val << SFUPDATE_UPDATE_SHIFT) & SFUPDATE_UPDATE_MASK))
 #endif
 
 struct bbl_regs {
@@ -1469,12 +1469,23 @@ static ssize_t counter_store(struct device *d,
 {
 	unsigned int val;
 	unsigned int reg;
-	sscanf(buf, "%d", &val);
-	// todo: CHECK VAL
-	// todo: LOCK
+	unsigned long flags;
+	struct bcm_iproc_bbl *iproc_bbl;
+
+	iproc_bbl = dev_get_drvdata(d);
+
+	if (sscanf(buf, "%u", &val) != 1){
+		return -EINVAL;
+	}
+	if (val > (SFUPDATE_CNT_MASK >> SFUPDATE_CNT_SHIFT)) {
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&iproc_bbl->lock, flags);
 	reg = sfupdate_read_reg(d);
 	sfupdate_write_reg(d, SFUPDATE_CNT_SET(val, reg));
-	// todo : UNLOCK
+	spin_unlock_irqrestore(&iproc_bbl->lock, flags);
+
 	return strnlen(buf, count);
 }
 
@@ -1497,12 +1508,24 @@ static ssize_t fail_store(struct device *d,
 {
 	unsigned int val;
 	unsigned int reg;
-	sscanf(buf, "%d", &val);
-	//todo: CHECK VAL
-	//todo: LOCK
+	unsigned long flags;
+	struct bcm_iproc_bbl *iproc_bbl;
+
+	iproc_bbl = dev_get_drvdata(d);
+
+	if (sscanf(buf, "%u", &val) != 1){
+		return -EINVAL;
+	}
+
+	if ((0 != val) && (1 != val)) {
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&iproc_bbl->lock, flags);
 	reg = sfupdate_read_reg(d);
 	sfupdate_write_reg(d, SFUPDATE_FAIL_SET(val, reg));
-	//todo: UNLOCK
+	spin_unlock_irqrestore(&iproc_bbl->lock, flags);
+
 	return strnlen(buf, count);
 }
 
@@ -1525,12 +1548,23 @@ static ssize_t update_store(struct device *d,
 {
 	unsigned int val;
 	unsigned int reg;
-	sscanf(buf, "%d", &val);
-	//todo: CHECK VAL
-	//todo: LOCK
+	unsigned long flags;
+	struct bcm_iproc_bbl *iproc_bbl;
+
+	iproc_bbl = dev_get_drvdata(d);
+
+	if (sscanf(buf, "%u", &val) != 1)
+		return -EINVAL;
+
+	if ((0 != val) && (1 != val)) {
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&iproc_bbl->lock, flags);
 	reg = sfupdate_read_reg(d);
 	sfupdate_write_reg(d, SFUPDATE_UPDATE_SET(val, reg));
-	//todo: UNLOCK
+	spin_unlock_irqrestore(&iproc_bbl->lock, flags);
+
 	return strnlen(buf, count);
 }
 
