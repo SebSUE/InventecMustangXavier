@@ -232,8 +232,6 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
   memset(&msg[bytesleft + 1], 0, XAVIER_I2C_NB_DATA_BYTES - bytesleft);
 
   ret += i2c_master_send(i2c, msg, XAVIER_I2C_NB_DATA_BYTES + 1);
-  printk(KERN_INFO "Xavier : %s - data : \nXavier : %*ph\n",
-	 __func__, XAVIER_I2C_NB_DATA_BYTES + 1, msg);
 
   mutex_unlock(&xavier->lock);
 
