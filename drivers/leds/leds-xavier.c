@@ -49,151 +49,266 @@
 #define XAVIER_LED_DURATION_MSG_LENGTH 4
 #define XAVIER_LED_STATE_LIST_SIZE 25
 #define XAVIER_DURATION_SIZE 4
+#define XAVIER_MCU_RAM_SIZE 10000
 
 #define CEILING(x,y) (((x) + (y) - 1) / (y))
 
 
+ struct animations {
+  int nb_animation;
+  int cur_animation;
+  int nb_pattern;
+  int cur_pattern;
+  int nb_fragment;
+  int data_fragment;
+  int pattern_size;
+  char *buffer;
+};
+
 struct xavier_led {
   struct device *dev;
   struct xavier_dev *mfd;
+  struct animations anims;
 };
 
 
 static ssize_t xavier_led_write(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t buf_size) {
+                                struct device_attribute *attr,
+                                const char *buf, size_t buf_size) {
 
-  struct xavier_dev *xavier_dev;
-  int i,j,ret,idx,nb_cycle,flash,duration,bytesleft;
+  int i;
+  int j;
+  int ret;
+  int idx;
+  int flash;
+  int bytesleft;
+  int offset;
+  int memoffset;
   uint8_t nb_message;
   uint8_t nb_animation;
   const char *buf_it;
+  struct xavier_dev *xavier_dev;
+  struct xavier_led *xavier_led;
+  struct animations *anims;
+
   xavier_dev = dev_get_drvdata(dev);
+
   if (xavier_dev == NULL) {
     ret = -EFAULT;
     printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+    goto exit;
+  }
+
+  xavier_led = platform_get_drvdata(xavier_dev->led_dev);
+  if (xavier_led == NULL) {
+    ret = -EFAULT;
+    printk(KERN_ERR "Xavier : %s - NULL LED device found \n", __func__);
+    goto exit;
+  }
+
+  anims = &xavier_led->anims;
+  if (!xavier_dev->boot) {
+    printk(KERN_ERR "Xavier : %s - can't send data, MCU boot is not done\n",
+           __func__);
+    ret = -EIO;
     goto error;
   }
 
-  xavier_dev->boot = 1;
-  if (xavier_dev->boot) {
-
-    printk(KERN_INFO "Xavier : Sending led animation\n");
-
-    /* If ledctl it's a list of led value */
-    if (xavier_dev->ledctl == 1) {
-
-      printk(KERN_INFO "Xavier : ledctl data : %*ph\n", XAVIER_NB_LED * 2, buf);
-      if (buf_size != XAVIER_NB_LED * 2) {
-	printk(KERN_ERR "Xavier : %s - Wrong data size\n",__func__);
-	ret = -EINVAL;
-	goto error;
-      }
-
-      ret = xavier_dev->write_dev(xavier_dev, XAVIER_NB_LED * 2, buf,
-				  XAVIER_HEADER_LED_ID);
-      if (ret < 0) {
-	ret = -EIO;
-	printk(KERN_ERR "Xavier : %s - Failed to write to the device \n",
-	       __func__);
-	goto error;
-      }
-
+  printk(KERN_INFO "Xavier : Sending led animations\n");
+    /* ledctl need a simple twelve led data */
+  if (xavier_dev->ledctl == 1) {
+    /*printk(KERN_INFO "Xavier : ledctl data : %*ph\n", XAVIER_NB_LED * 2, buf);*/
+    if (buf_size != XAVIER_NB_LED * 2) {
+      printk(KERN_ERR "Xavier : %s - Wrong data size\n",__func__);
+      ret = -EINVAL;
+      goto error;
     }
-    else{
 
-      printk(KERN_INFO "Xavier : Checking data structure : \n");
-      /* Checking data structure */
-      buf_it = buf;
+    ret = xavier_dev->write_dev(xavier_dev, XAVIER_NB_LED * 2, buf,
+      XAVIER_HEADER_LED_ID);
+    if (ret < 0) {
+      ret = -EIO;
+      printk(KERN_ERR "Xavier : %s - Failed to write to the device \n",
+             __func__);
+      goto error;
+    }
+  }
+  else {
+        /* Checking data structure */
+    buf_it = buf;
+    offset = 0;
+    if (anims->data_fragment > 0) {
+      offset += anims->data_fragment;
+      buf_it += offset;
+      anims->cur_pattern++;
+    }
+    else {
 
       /* First byte is the animation number */
       nb_animation = buf_it[0] & XAVIER_LED_NB_ANIMATION_MASK;
-      printk(KERN_INFO "Xavier : %d animation in the file\n",nb_animation);
+      printk(KERN_INFO "Xavier : %d animation in the file\n", nb_animation);
       flash = buf_it[0] >> XAVIER_LED_FLASH_SHIFT_MASK;
+
+      if (flash)
+        anims->pattern_size = XAVIER_LED_FLASH_PATTERN_SIZE;
+      else
+        anims->pattern_size = XAVIER_LED_RAM_PATTERN_SIZE;
+
+      /* Initiate animation structure */
+
+      anims->nb_animation = nb_animation;
+      anims->cur_animation = 0;
+      anims->nb_pattern = 0;
+      anims->cur_pattern = 0;
+      anims->nb_fragment = 0;
+      anims->data_fragment = 0;
+      anims->buffer = NULL;
+
       buf_it++;
-
-      /* Check every animation to be sure that the file
-	 correspond to a led animation file */
-      for (i = 0; i < nb_animation; i++) {
-
-	if (buf_it == NULL) {
-	  printk(KERN_ERR "Xavier : %s - Wrong binary data formating,NULL pointer found\n",
-		 __func__);
-	  ret = -EINVAL;
-	  goto error;
-	}
-
-	idx = buf_it[0] & XAVIER_LED_IDX_MASK;
-
-	printk(KERN_INFO "Xavier : Animation %d :\n",idx);
-	/*idx must be in the right order allowing easier structure checking */
-	if (idx != i) {
-	  printk(KERN_ERR "Xavier : %s - Wrong binary data formating : found %d needed %d\n",
-		 __func__, idx ,i);
-	  ret = -EINVAL;
-	  goto error;
-	}
-
-	/*check for the number of pattern and skip them */
-	nb_cycle = buf_it[1];
-	duration = 0;
-	buf_it++;
-	if (flash) {
-	  for (j = 0; j < nb_cycle; j++) {
-	    printk(KERN_INFO "Pattern %d : %*ph\n", j,
-		   XAVIER_LED_FLASH_PATTERN_SIZE, buf_it + 1);
-	    buf_it += XAVIER_LED_FLASH_PATTERN_SIZE;
-	  }
-	}
-	else {
-	  for (j = 0; j < nb_cycle; j++) {
-	    printk(KERN_INFO "Pattern %d : %*ph\n", j,
-		   XAVIER_LED_RAM_PATTERN_SIZE, buf_it + 1);
-	    buf_it += XAVIER_LED_RAM_PATTERN_SIZE;
-	  }
-	}
-
-	buf_it++;
-      }
-
-      /*compute the number of message necessary for the data */
-      nb_message = CEILING(buf_size, XAVIER_I2C_MESSAGE_MAX_SIZE);
-
-      /* The first message is the number of message to be sent */
-      ret = xavier_dev->write_dev(xavier_dev, sizeof(uint8_t), &nb_message,
-				  XAVIER_HEADER_LED_ID);
-      if (ret < 0) {
-	ret = -EIO;
-	printk(KERN_ERR "Xavier : %s - Failed to send to device\n", __func__);
-	goto error;
-      }
-
-      bytesleft = buf_size;
-      for (i = 0; i < nb_message; i++) {
-
-	buf_it = buf + (i * XAVIER_I2C_MESSAGE_MAX_SIZE);
-
-	if (bytesleft < XAVIER_I2C_MESSAGE_MAX_SIZE)
-	  ret += xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
-				       buf_it, XAVIER_HEADER_LED_ID);
-	else
-	  ret += xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
-				       buf_it, XAVIER_HEADER_LED_ID);
-	if (ret < 0) {
-	  ret = -EIO;
-	  printk(KERN_ERR "Xavier : %s - Failed to send to device\n", __func__);
-	  goto error;
-	}
-	bytesleft  -= XAVIER_I2C_MESSAGE_MAX_SIZE;
-	printk(KERN_INFO "Xavier : %*ph\n" , XAVIER_I2C_MESSAGE_MAX_SIZE,buf_it);
-      }
+      offset++;
     }
+        /* Check every animation to be sure that the file
+            correspond to a led animation file */
+    for (i = anims->cur_animation; i < anims->nb_animation; i++) {
+
+      if (buf_it == NULL) {
+        printk(KERN_ERR "Xavier : %s - Wrong binary data formating, NULL pointer found\n",
+                __func__);
+        ret = -EINVAL;
+        goto error;
+      }
+
+      if (anims->cur_pattern == 0) {
+        /* if there is not enough space for the begining
+        of an animation (idx + nb_pattern + first pattern)
+        copy everything and leave the loop */
+        if (offset + (2 + anims->pattern_size) > PAGE_SIZE) {
+          if (anims->buffer == NULL)
+            anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
+          memoffset = anims->nb_fragment * PAGE_SIZE;
+          memcpy(&anims->buffer[memoffset], buf, PAGE_SIZE);
+              /* compute the fragment of pattern at the end of the buffer */
+          anims->data_fragment = anims->pattern_size - (offset - PAGE_SIZE);
+          anims->cur_animation = i;
+          anims->nb_pattern = buf_it[1];
+          anims->cur_pattern = 0;
+          anims->nb_fragment++;
+          ret = buf_size;
+          goto exit;
+        }
+
+        idx = buf_it[0] & XAVIER_LED_IDX_MASK;
+
+            /*idx must be in the right order allowing easier structure checking */
+        if (idx != i) {
+          printk(KERN_ERR "Xavier : %s - Wrong binary data formating : found %d needed %d\n",
+                  __func__, idx ,i);
+          ret = -EINVAL;
+          goto error;
+        }
+        buf_it++;
+        offset++;
+
+            /*check for the number of pattern and skip them */
+        anims->nb_pattern = buf_it[0];
+      }
+
+      for (j = anims->cur_pattern; j < anims->nb_pattern; j++) {
+       /* printk(KERN_INFO "Pattern %d : %*ph\n", j,
+          anims->pattern_size, buf_it + 1); */
+
+        /* if there is not enough space for a pattern
+        copy everything and leave the loop */
+        if (offset + anims->pattern_size > PAGE_SIZE) {
+          if (anims->buffer == NULL)
+            anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
+          memoffset = anims->nb_fragment * PAGE_SIZE;
+
+          if (memoffset + PAGE_SIZE > XAVIER_MCU_RAM_SIZE) {
+              printk(KERN_ERR "Xavier : %s - Data to big for MCU RAM %lu > %d\n",
+                     __func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
+              ret = -EINVAL;
+              goto error;
+          }
+          memcpy(&anims->buffer[memoffset], buf, PAGE_SIZE);
+              /* compute the fragment of pattern at the end of the buffer */
+          anims->data_fragment = anims->pattern_size - (PAGE_SIZE - offset);
+          anims->cur_animation = i;
+          anims->nb_pattern = anims->nb_pattern;
+          anims->cur_pattern = j;
+          anims->nb_fragment++;
+          ret = buf_size;
+          goto exit;
+        }
+        buf_it += anims->pattern_size;
+        offset += anims->pattern_size;
+      }
+      buf_it++;
+      offset++;
+
+
+       if (anims->buffer == NULL)
+            anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
+       memoffset = anims->nb_fragment*PAGE_SIZE;
+       if (memoffset + buf_size > XAVIER_MCU_RAM_SIZE) {
+            printk(KERN_ERR "Xavier : %s - Data to big for MCU RAM %lu > %d\n",
+                   __func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
+            ret = -EINVAL;
+            goto error;
+          }
+       memcpy(&anims->buffer[memoffset], buf, buf_size);
+    }
+    /*print_hex_dump(KERN_INFO,"", DUMP_PREFIX_NONE, 16, 1, anims->buffer, anims->nb_fragment* PAGE_SIZE + buf_size,false);*/
+          /*compute the number of message necessary for the data */
+    nb_message = CEILING(anims->nb_fragment* PAGE_SIZE + buf_size,
+                          XAVIER_I2C_MESSAGE_MAX_SIZE);
+
+          /* The first message is the number of message to be sent */
+    ret = xavier_dev->write_dev(xavier_dev, sizeof(uint8_t), &nb_message,
+                                XAVIER_HEADER_LED_ID);
+    if (ret < 0) {
+     ret = -EIO;
+     printk(KERN_ERR "Xavier : %s - Failed to send to device\n", __func__);
+     goto error;
+   }
+
+   bytesleft = anims->nb_fragment * PAGE_SIZE + buf_size;
+
+   for (i = 0; i < nb_message; i++) {
+
+     buf_it = anims->buffer + (i * XAVIER_I2C_MESSAGE_MAX_SIZE);
+     if (bytesleft < XAVIER_I2C_MESSAGE_MAX_SIZE) {
+       ret += xavier_dev->write_dev(xavier_dev, bytesleft,
+         buf_it, XAVIER_HEADER_LED_ID);
+     }
+     else {
+       ret += xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
+         buf_it, XAVIER_HEADER_LED_ID);
+     }
+     if (ret < 0) {
+       ret = -EIO;
+       printk(KERN_ERR "Xavier : %s - Failed to send to device\n", __func__);
+       goto error;
+     }
+     bytesleft -= XAVIER_I2C_MESSAGE_MAX_SIZE;
+   }
   }
-
   printk(KERN_INFO "Xavier : Animation sucessfully sent\n");
-  return buf_size;
+  ret = buf_size;
 
- error:
+  error:
+  if (anims->buffer != NULL) {
+    kfree(anims->buffer);
+    anims->buffer = NULL;
+  }
+  anims->nb_animation = 0;
+  anims->cur_animation = 0;
+  anims->nb_pattern = 0;
+  anims->cur_pattern = 0;
+  anims->nb_fragment = 0;
+  anims->data_fragment = 0;
+  anims->pattern_size = 0;
+  exit:
   return ret;
 
 }
@@ -571,8 +686,9 @@ static ssize_t xavier_led_ena_store(struct device *dev,
 				    struct device_attribute *attr,
 				    const  char *buf, size_t count) {
 
-  int ret;
   char data;
+  int ret;
+  int temp;
   struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
   if (xavier_dev == NULL) {
@@ -581,23 +697,30 @@ static ssize_t xavier_led_ena_store(struct device *dev,
     goto exit;
   }
 
+  data = XAVIER_CONTROL_LED_ENA << XAVIER_CONTROL_TYPE_SHIFT;
+  data += buf[0] << 4; /*3 bits for control idx (0) then 1 bit for the value */
 
-  ret = kstrtoint(buf, 0, &xavier_dev->led_ena);
+  ret = kstrtoint(buf, 0, &temp);
   if (ret) {
     printk(KERN_ERR "Xavier : %s - Failed to transform data \n", __func__);
     goto exit;
   }
-  /* if not enable send a stop to the MCU */
-  if (xavier_dev->led_ena == 0) {
-    data = XAVIER_CONTROL_CUR_STATE << 5; /* 0xE0(3bits) for idx */
-    data += XAVIER_LED_STOP_STATE_IDX; /* 0x18 (2bits) for stop */
-    ret = xavier_dev->write_dev(xavier_dev, 1,
-				&data, XAVIER_HEADER_CONTROL_ID);
-    if (ret < 0) {
-      ret = -EIO;
-      printk(KERN_ERR "Xavier : %s - Failed to write to the device\n", __func__);
-      goto exit;
-    }
+
+  if (temp != 0 &&  temp != 1) {
+    ret = -EINVAL;
+    printk(KERN_ERR "Xavier : %s - Wrong value must be 1 or 0 : found %d\n",
+     __func__, temp);
+    goto exit;
+  }
+
+  xavier_dev->led_ena = temp;
+
+  /*write the new value to MCU to make it ready */
+  ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
+  if (ret < 0) {
+    ret = -EIO;
+    printk(KERN_ERR "Xavier : %s - Failed to write to the device\n", __func__);
+    goto exit;
   }
 
   return count;
@@ -613,6 +736,7 @@ static ssize_t xavier_ledctl_store(struct device *dev,
 
   char data;
   int ret;
+  int temp;
 
   struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
@@ -623,12 +747,21 @@ static ssize_t xavier_ledctl_store(struct device *dev,
   }
 
   data = buf[0] << 4;
-  ret = kstrtoint(buf, 0, &xavier_dev->ledctl);
+  ret = kstrtoint(buf, 0, &temp);
 
   if (ret) {
     printk(KERN_ERR "Xavier : %s - Failed to transform data \n", __func__);
     goto exit;
   }
+
+  if (temp != 0 &&  temp != 1) {
+    ret = -EINVAL;
+    printk(KERN_ERR "Xavier : %s - Wrong value must be 1 or 0 : found %d\n",
+     __func__, temp);
+    goto exit;
+  }
+
+  xavier_dev->ledctl = temp;
 
   /*write the new value to MCU to make it ready */
   ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
