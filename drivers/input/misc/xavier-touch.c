@@ -33,6 +33,7 @@
 #define XAVIER_TOUCH_MAX_EVENT_SIZE 4
 #define XAVIER_TOUCH_LOCATION_MAX_VALUE 127
 #define XAVIER_TOUCH_VELOCITY_MAX_VALUE 127
+#define XAVIER_LOCATION_INCREMENT 5
 
 #define XAVIER_TOUCH_ID_EVENT_MASK 0xE0 /* 3 first MSB bits */
 #define XAVIER_TOUCH_BTN0_EVENT_MASK 0x10 /* 1 bit after id event */
@@ -145,7 +146,8 @@ static int input_handler(struct platform_device *touch_dev,
     input_report_key(xavier_touch->input_dev,
 		     xavier_touch->btn_wheel, BTN_PRESSED);
 
-    input_report_abs(xavier_touch->input_dev, xavier_touch->abs_wheel, location);
+    input_report_abs(xavier_touch->input_dev, xavier_touch->abs_wheel,
+                     location * XAVIER_LOCATION_INCREMENT);
 
     break;
 
@@ -177,7 +179,8 @@ static int input_handler(struct platform_device *touch_dev,
     velocity += ((data[2] & XAVIER_TOUCH_VELOCITY_EVENT_LSB_MASK) >>
 		 XAVIER_TOUCH_VELOCITY_EVENT_LSB_SHIFT);
 
-    input_report_abs(xavier_touch->input_dev, xavier_touch->abs_wheel, location);
+    input_report_abs(xavier_touch->input_dev, xavier_touch->abs_wheel,
+                     location * XAVIER_LOCATION_INCREMENT);
     input_report_abs(xavier_touch->input_dev,
 		     xavier_touch->direction, orientation );
     input_report_abs(xavier_touch->input_dev, xavier_touch->velocity, velocity);
@@ -196,6 +199,9 @@ static int input_handler(struct platform_device *touch_dev,
     printk(KERN_ERR "Xavier : Error received unknown data : %s\n", data);
     break;
   }
+
+  //Sync the new report for this device
+  input_sync(xavier_touch->input_dev);
 
  error:
   return ret;
