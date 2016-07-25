@@ -62,6 +62,7 @@
   int nb_fragment;
   int data_fragment;
   int pattern_size;
+  int data_size;
   char *buffer;
 };
 
@@ -121,6 +122,7 @@ static ssize_t xavier_led_write(struct device *dev,
     if (buf_size != XAVIER_NB_LED * 2) {
       printk(KERN_ERR "Xavier : %s - Wrong data size\n",__func__);
       ret = -EINVAL;
+      xavier_dev->error_code = ERROR_LED_MSG;
       goto error;
     }
 
@@ -162,6 +164,7 @@ static ssize_t xavier_led_write(struct device *dev,
       anims->cur_pattern = 0;
       anims->nb_fragment = 0;
       anims->data_fragment = 0;
+      anims->data_size = 0;
       anims->buffer = NULL;
 
       buf_it++;
@@ -175,6 +178,7 @@ static ssize_t xavier_led_write(struct device *dev,
         printk(KERN_ERR "Xavier : %s - Wrong binary data formating, NULL pointer found\n",
                 __func__);
         ret = -EINVAL;
+        xavier_dev->error_code = ERROR_LED_MSG;
         goto error;
       }
 
@@ -204,6 +208,7 @@ static ssize_t xavier_led_write(struct device *dev,
           printk(KERN_ERR "Xavier : %s - Wrong binary data formating : found %d needed %d\n",
                   __func__, idx ,i);
           ret = -EINVAL;
+          xavier_dev->error_code = ERROR_LED_MSG;
           goto error;
         }
         buf_it++;
@@ -228,6 +233,7 @@ static ssize_t xavier_led_write(struct device *dev,
               printk(KERN_ERR "Xavier : %s - Data to big for MCU RAM %lu > %d\n",
                      __func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
               ret = -EINVAL;
+              xavier_dev->error_code = ERROR_LED_MSG;
               goto error;
           }
           memcpy(&anims->buffer[memoffset], buf, PAGE_SIZE);
@@ -249,17 +255,30 @@ static ssize_t xavier_led_write(struct device *dev,
 
        if (anims->buffer == NULL)
             anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
-       memoffset = anims->nb_fragment*PAGE_SIZE;
+       memoffset = anims->nb_fragment * PAGE_SIZE;
        if (memoffset + buf_size > XAVIER_MCU_RAM_SIZE) {
             printk(KERN_ERR "Xavier : %s - Data to big for MCU RAM %lu > %d\n",
                    __func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
             ret = -EINVAL;
+            xavier_dev->error_code = ERROR_LED_MSG;
             goto error;
-          }
+       }
        memcpy(&anims->buffer[memoffset], buf, buf_size);
+
+       /* Set data for the next animation */
+       anims->cur_animation = i + 1;
+       anims->cur_pattern = 0;
     }
     /*print_hex_dump(KERN_INFO,"", DUMP_PREFIX_NONE, 16, 1, anims->buffer, anims->nb_fragment* PAGE_SIZE + buf_size,false);*/
           /*compute the number of message necessary for the data */
+    memoffset = anims->nb_fragment * PAGE_SIZE + buf_size - 1;
+    if (anims->data_size !=  memoffset) {
+      printk(KERN_ERR "Xavier : %s - File size mismatch : found %d should be %d\n", __func__, memoffset, anims->data_size);
+      ret = -EINVAL;
+      xavier_dev->error_code = ERROR_LED_MSG;
+      goto error;
+    }
+
     nb_message = CEILING(anims->nb_fragment* PAGE_SIZE + buf_size,
                           XAVIER_I2C_MESSAGE_MAX_SIZE);
 
@@ -762,6 +781,7 @@ static ssize_t xavier_ledctl_store(struct device *dev,
   }
 
   xavier_dev->ledctl = temp;
+  xavier_dev->error_code = 0;
 
   /*write the new value to MCU to make it ready */
   ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
