@@ -216,6 +216,7 @@ static ssize_t xavier_led_write(struct device *dev,
 
             /*check for the number of pattern and skip them */
         anims->nb_pattern = buf_it[0];
+        anims->data_size += 2 + (anims->nb_pattern * anims->pattern_size);
       }
 
       for (j = anims->cur_pattern; j < anims->nb_pattern; j++) {
