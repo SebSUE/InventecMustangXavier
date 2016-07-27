@@ -1569,6 +1569,7 @@ static ssize_t update_store(struct device *d,
 }
 
 static DEVICE_ATTR(update, (S_IWUSR | S_IRUGO), update_show, update_store);
+
 static struct attribute *sfupdate_dev_attrs[] = {
 	&dev_attr_counter.attr,
 	&dev_attr_fail.attr,
@@ -1576,15 +1577,11 @@ static struct attribute *sfupdate_dev_attrs[] = {
 	NULL
 };
 
-ATTRIBUTE_GROUPS(sfupdate_dev);
-
-static struct miscdevice sfupdate_dev = {
-	.minor = MISC_DYNAMIC_MINOR,
+static struct attribute_group sfupdate_attr_group = {
 	.name = "sfupdate",
-	.fops = NULL,
-
-	.groups = sfupdate_dev_groups
+	.attrs = sfupdate_dev_attrs,
 };
+
 #endif
 
 static int bbl_init(struct bcm_iproc_bbl *iproc_bbl)
@@ -1893,14 +1890,9 @@ static int iproc_bbl_probe(struct platform_device *pdev)
 	}
 #if SFUPDATE
 	if (iproc_bbl->tamper_enable) {
-		ret = misc_register(&sfupdate_dev);
-		/* Store iproc_bbl for misc driver */
-		dev_set_drvdata(sfupdate_dev.this_device, iproc_bbl);
-		if (ret) {
-			printk(KERN_ERR
-				"Unable to register \"sfupdate\" misc device\n");
+		ret = sysfs_create_group(&pdev->dev.kobj, &sfupdate_attr_group);
+		if (ret < 0)
 			goto fail_sysfs;
-		}
 	}
 #endif
 
@@ -1927,7 +1919,7 @@ static int iproc_bbl_remove(struct platform_device *pdev)
 
 	if (iproc_bbl->tamper_enable) {
 #if SFUPDATE
-		misc_deregister(&sfupdate_dev);
+		sysfs_remove_group(&pdev->dev.kobj, &sfupdate_attr_group);
 #endif
 		sysfs_remove_group(&pdev->dev.kobj, &bbl_attr_group);
 	}
