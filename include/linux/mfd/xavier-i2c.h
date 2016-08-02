@@ -20,6 +20,7 @@
 #ifndef __LINUX_MFD_XAVIER_H
 #define __LINUX_MFD_XAVIER_H
 
+#include <linux/device.h>
 #define XAVIER_VERSION_SIZE 20
 #define XAVIER_CUR_STATE_SIZE 35
 
@@ -29,7 +30,6 @@
 #define XAVIER_HEADER_CONTROL_ID 0
 #define XAVIER_HEADER_LED_ID 1
 #define XAVIER_HEADER_TOUCH_ID 2
-
 
 #define XAVIER_CONTROL_LEDCTL 0x00
 #define XAVIER_CONTROL_TOUCH 0x01
@@ -57,35 +57,36 @@
 #define ERROR_LED_LENGTH    10
 #define ERROR_WDT           11
 
-
 struct xavier_dev {
-  struct device *dev;
-  struct platform_device *touch_dev;
-  struct platform_device *led_dev;
-  struct i2c_client *i2c;
-  int (*read_dev)(struct xavier_dev *xavier, void *dest, int size, int *child);
-  int (*write_dev)(struct xavier_dev *xavier, int size, const void *src, int child);
-  int (*input_handler)(struct platform_device *touch_dev,char *data, int size);
-  int irq;
-  int slave_int;
-  int reset_gpio;
-  struct mutex lock;
-  struct workqueue_struct *workqueue;
-  struct work_struct interrupt_work;
-  struct work_struct *input_work;
+	struct device *dev;
+	struct platform_device *touch_dev;
+	struct platform_device *led_dev;
+	struct i2c_client *i2c;
+	int (*read_dev)(struct xavier_dev *xavier, void *dest, int size,
+			int *child);
+	int (*write_dev)(struct xavier_dev *xavier, int size, const void *src,
+			 int child);
+	int (*input_handler)(struct platform_device *touch_dev,char *data,
+			     int size);
+	int irq;
+	int slave_int;
+	int reset_gpio;
+	struct mutex lock;
+	struct workqueue_struct *workqueue;
+	struct work_struct interrupt_work;
+	struct work_struct *input_work;
 
-  /*sysfs variables */
-  int boot;
-  int error_code;
-  int flash;
-  int reset;
-  int touch_ena;
-  int led_ena;
-  int ledctl;
-  int reset_cause;
-  char version[XAVIER_VERSION_SIZE];
-  char cur_state[XAVIER_CUR_STATE_SIZE];
+	/*sysfs variables */
+	int boot;
+	int error_code;
+	int flash;
+	int reset;
+	int touch_ena;
+	int led_ena;
+	int ledctl;
+	int reset_cause;
+	char version[XAVIER_VERSION_SIZE];
+	char cur_state[XAVIER_CUR_STATE_SIZE];
 };
-
 
 #endif
