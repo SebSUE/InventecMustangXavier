@@ -180,6 +180,19 @@
 		status = "okay";
 
 	};
+	xavier: xavier@1c {
+		reg = <0x1c>;
+		compatible = "xavier";
+		gpio = <&gpio_ccm 8 1>;
+		reset-gpio = <&gpio_ccm 9 0>;
+		btn0 = <0x100>;
+		btn1 = <0x101>;
+		btn_wheel = <0x150>;
+		abs_wheel = <0x08>;
+		direction = <0x34>;
+		velocity = <0x28>;
+		status = "okay";
+	};
 };
 
 &pcie0 {
