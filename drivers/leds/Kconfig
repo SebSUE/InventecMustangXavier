@@ -605,6 +605,13 @@ config LEDS_VERSATILE
 	  This option enabled support for the LEDs on the ARM Versatile
 	  and RealView boards. Say Y to enabled these.
 
+config LEDS_XAVIER
+	tristate "LED Support for XAVIER board LEDs"
+	depends on MFD_XAVIER
+	help
+	  This option enables support for i2c driven LEDs connected to the
+	  xavier board.
+
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
 
