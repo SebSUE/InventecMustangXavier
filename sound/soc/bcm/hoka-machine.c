@@ -731,28 +731,39 @@ static int cygnussvk_hw_params_aic3x(struct snd_pcm_substream *substream,
 
 	switch (params_rate(params)) {
 	case  8000:
+		mclk_freq = 4096000;
 	case 16000:
-		mclk_freq = 6144000;
+	case 48000:
+		mclk_freq = 24576000;
 		break;
 	case 32000:
-	case 48000:
-		mclk_freq = 12288000;
+		mclk_freq = 16384000;
 		break;
 	case 96000:
-	case 192000:
-		mclk_freq = 24576000;
+		mclk_freq = 49152000;
 		break;
 	case 11025:
 	case 22050:
 	case 44100:
-		mclk_freq = 5644800;
+		mclk_freq = 22579200;
 		break;
 	case  88200:
+		mclk_freq = 45158400;
+		break;
 	case 176400:
+	case 192000:
 		mclk_freq = 22579200;
 		break;
 	default:
 		return -EINVAL;
+	}
+
+	ret = snd_soc_dai_set_sysclk(cpu_dai, CYGNUS_SSP_CLKSRC_PLL,
+				mclk_freq, SND_SOC_CLOCK_OUT);
+	if (ret < 0) {
+//		dev_err(dev, "%s Failed snd_soc_dai_set_sysclk\n", __func__);
+		printk("[ADK] %s Failed snd_soc_dai_set_sysclk\n", __func__);
+		return ret;
 	}
 
 	// ret = snd_soc_dai_set_sysclk(codec_dai, /* [ADK] CLKIN_MCLK */CLKIN_GPIO2, mclk_freq, SND_SOC_CLOCK_IN);
@@ -779,14 +790,6 @@ static int cygnussvk_hw_params_aic3x(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
-	ret = snd_soc_dai_set_sysclk(cpu_dai, CYGNUS_SSP_CLKSRC_PLL,
-				mclk_freq, SND_SOC_CLOCK_OUT);
-	if (ret < 0) {
-//		dev_err(dev, "%s Failed snd_soc_dai_set_sysclk\n", __func__);
-		printk("[ADK] %s Failed snd_soc_dai_set_sysclk\n", __func__);
-		return ret;
-	}
-
 #if 0
 [ADK]
 	/* Set codec as I2S slave */
@@ -803,7 +806,7 @@ static int cygnussvk_hw_params_aic3x(struct snd_pcm_substream *substream,
 				| SND_SOC_DAIFMT_IB_NF;
 // ---> I try that, but it fails later ..				| SND_SOC_DAIFMT_NB_NF;
 		} else {
-			printk("[ADK] %s Set SSP as slave.\n", __func__);
+//			printk("[ADK] %s Set SSP as slave.\n", __func__);
 			format = SND_SOC_DAIFMT_CBM_CFM
 				| SND_SOC_DAIFMT_DSP_B
 				| SND_SOC_DAIFMT_IB_NF;
@@ -873,11 +876,11 @@ static int cygnussvk_hw_params_aic3x(struct snd_pcm_substream *substream,
 		mask = 0;
 		for (i = 0; i < channels; i++)
 			mask |= BIT(i);
+/* [ADK] *///		mask <<= (linknum*2);  // set a different TDM offset for TLV320AIC3x parts
 
-/* [ADK] */		mask <<= (linknum*2);  // set a different TDM offset for TLV320AIC3x parts
 		slots = bit_per_frame / width;
 
-//		printk("[ADK] %s TDM: slots=%d, mask=0x%x\n", __func__, slots, mask);
+//		printk("[JMA] %s TDM: slots=%d, mask=0x%x\n", __func__, slots, mask);
 
 		ret = snd_soc_dai_set_tdm_slot(cpu_dai, mask, mask,
 					slots, width);
