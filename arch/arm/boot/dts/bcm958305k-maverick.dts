@@ -48,6 +48,13 @@
 		stdout-path = "serial0:115200n8";
 	};
 
+	axi {
+		pinctrl: pinctrl@0x0301d0c8 {
+			pinctrl-names = "default";
+			pinctrl-0 = <&i2s_0>;
+		};
+	};
+
 	sound {
 /*		compatible = "bcm,cygnussvk-machine";  */
 		compatible = "bcm,cygnus-hoka-machine";
