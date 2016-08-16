@@ -164,7 +164,8 @@ static int input_handler(struct platform_device *touch_dev,
 				 xavier_touch->btn_wheel, BTN_RELEASED);
 
 		input_report_abs(xavier_touch->input_dev,
-				 xavier_touch->abs_wheel, location);
+				 xavier_touch->abs_wheel,
+				 location * XAVIER_LOCATION_INCREMENT);
 		break;
 
 	case POSITION_CHANGE_EVENT: /* position_change_ring */
