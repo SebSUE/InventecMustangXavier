@@ -54,6 +54,7 @@ struct bcm_device {
 	const char		*name;
 	struct gpio_desc	*device_wakeup;
 	struct gpio_desc	*shutdown;
+	struct gpio_desc	*host_wakeup;
 
 	struct clk		*clk;
 	bool			clk_enabled;
@@ -618,6 +619,7 @@ unlock:
 }
 #endif
 
+#ifdef CONFIG_ACPI
 static const struct acpi_gpio_params device_wakeup_gpios = { 0, 0, false };
 static const struct acpi_gpio_params shutdown_gpios = { 1, 0, false };
 static const struct acpi_gpio_params host_wakeup_gpios = { 2, 0, false };
@@ -629,7 +631,6 @@ static const struct acpi_gpio_mapping acpi_bcm_default_gpios[] = {
 	{ },
 };
 
-#ifdef CONFIG_ACPI
 static u8 acpi_active_low = ACPI_ACTIVE_LOW;
 
 /* IRQ polarity of some chipsets are not defined correctly in ACPI table. */
@@ -679,7 +680,7 @@ static int bcm_resource(struct acpi_resource *ares, void *data)
 	return 1;
 }
 
-static int bcm_acpi_probe(struct bcm_device *dev)
+static int bcm_gpio_probe(struct bcm_device *dev)
 {
 	struct platform_device *pdev = dev->pdev;
 	LIST_HEAD(resources);
@@ -746,9 +747,33 @@ static int bcm_acpi_probe(struct bcm_device *dev)
 	return 0;
 }
 #else
-static int bcm_acpi_probe(struct bcm_device *dev)
+static int bcm_gpio_probe(struct bcm_device *dev)
 {
-	return -EINVAL;
+	struct platform_device *pdev = dev->pdev;
+
+	dev->name = dev_name(&pdev->dev);
+
+	/* Retrieve GPIO data */
+	dev->device_wakeup = devm_gpiod_get_optional(&pdev->dev,
+						     "device-wakeup",
+						     GPIOD_OUT_LOW);
+	if (IS_ERR(dev->device_wakeup))
+		return PTR_ERR(dev->device_wakeup);
+
+	dev->shutdown = devm_gpiod_get_optional(&pdev->dev, "shutdown",
+						GPIOD_OUT_LOW);
+	if (IS_ERR(dev->shutdown))
+		return PTR_ERR(dev->shutdown);
+
+	dev->host_wakeup = devm_gpiod_get_optional(&pdev->dev, "host-wakeup",
+		GPIOD_IN);
+	if (IS_ERR(dev->host_wakeup))
+		return PTR_ERR(dev->host_wakeup);
+
+	dev->irq = gpiod_to_irq(dev->host_wakeup);
+	dev_info(&pdev->dev, "BCM irq: %d\n", dev->irq);
+
+	return 0;
 }
 #endif /* CONFIG_ACPI */
 
@@ -763,7 +788,7 @@ static int bcm_probe(struct platform_device *pdev)
 
 	dev->pdev = pdev;
 
-	ret = bcm_acpi_probe(dev);
+	ret = bcm_gpio_probe(dev);
 	if (ret)
 		return ret;
 
@@ -789,8 +814,16 @@ static int bcm_remove(struct platform_device *pdev)
 	list_del(&dev->list);
 	mutex_unlock(&bcm_device_lock);
 
+#ifdef CONFIG_ACPI
 	acpi_dev_remove_driver_gpios(ACPI_COMPANION(&pdev->dev));
-
+#else
+	if (dev->shutdown)
+		devm_gpiod_put(&pdev->dev, dev->shutdown);
+	if (dev->host_wakeup)
+		devm_gpiod_put(&pdev->dev, dev->host_wakeup);
+	if (dev->device_wakeup)
+		devm_gpiod_put(&pdev->dev, dev->device_wakeup);
+#endif
 	dev_info(&pdev->dev, "%s device unregistered.\n", dev->name);
 
 	return 0;
@@ -819,21 +852,36 @@ static const struct acpi_device_id bcm_acpi_match[] = {
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, bcm_acpi_match);
+#else
+
+static const struct of_device_id bcm_of_match[] = {
+	{.compatible = "hci_bcm", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, bcm_of_match);
 #endif
 
+#ifdef CONFIG_PM_SLEEP
 /* Platform suspend and resume callbacks */
 static const struct dev_pm_ops bcm_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(bcm_suspend, bcm_resume)
 	SET_RUNTIME_PM_OPS(bcm_suspend_device, bcm_resume_device, NULL)
 };
+#endif
 
 static struct platform_driver bcm_driver = {
 	.probe = bcm_probe,
 	.remove = bcm_remove,
 	.driver = {
 		.name = "hci_bcm",
+#ifdef CONFIG_ACPI
 		.acpi_match_table = ACPI_PTR(bcm_acpi_match),
+#else
+		.of_match_table = of_match_ptr(bcm_of_match),
+#endif
+#ifdef CONFIG_PM_SLEEP
 		.pm = &bcm_pm_ops,
+#endif
 	},
 };
 
