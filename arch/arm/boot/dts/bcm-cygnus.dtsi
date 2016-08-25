@@ -443,6 +443,13 @@
 			bt-host-wake-gpio = <&gpio_crmu 5 0>;
 		};
 
+		hci_bcm {
+			compatible = "hci_bcm";
+			device-wakeup = <&gpio_asiu 24 0>;
+			host-wakeup = <&gpio_crmu 5 0>;
+			shutdown = <&gpio_crmu 3 0>;
+		};
+
 		bbl: iproc_bbl@0x03026000 {
 			compatible = "brcm,iproc-bbl";
 			reg = <0x03026000 0x10>;
