@@ -56,7 +56,7 @@
 	};
 
 	sound {
-/*		compatible = "bcm,cygnussvk-machine";  */
+/*		compatible = "bcm,cygnussvk-machine"; */
 		compatible = "bcm,cygnus-hoka-machine";
 		bcm,cygnus-pcm = <&cygnus_audio>;
 
@@ -179,10 +179,10 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 
-		nand-ecc-strength = <24>;
-		nand-ecc-step-size = <1024>;
+		nand-ecc-strength = <8>;
+		nand-ecc-step-size = <512>;
 
-		brcm,nand-oob-sector-size = <27>;
+		brcm,nand-oob-sector-size = <16>;
 	};
 
 };
@@ -193,4 +193,9 @@
 		status = "okay";
 };
 
+&bbl {
+	rtc-enable;
+	tamper-enable;
+	status = "okay";
+};
 
