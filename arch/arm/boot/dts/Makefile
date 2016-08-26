@@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
 	bcm958300k.dtb \
 	bcm958305k-xavier.dtb \
 	bcm958305k-mustang.dtb \
+	bcm958305k-maverick.dtb \
 	bcm958305k.dtb
 dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
 	bcm28155-ap.dtb \
