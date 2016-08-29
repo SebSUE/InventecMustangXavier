@@ -23,6 +23,7 @@
 #include <linux/device.h>
 #define XAVIER_VERSION_SIZE 20
 #define XAVIER_CUR_STATE_SIZE 35
+#define XAVIER_CUR_VERSION "V0.0.1_RC5"
 
 #define XAVIER_I2C_MESSAGE_MAX_SIZE 120
 #define XAVIER_I2C_NB_DATA_BYTES 20

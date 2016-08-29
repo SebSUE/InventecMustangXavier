@@ -774,7 +774,9 @@ static void xavier_interrupt_work(struct work_struct *work)
 						strncpy(xavier_dev->version, &buf[1], XAVIER_VERSION_SIZE);
 						xavier_dev->boot = 1;
 						xavier_dev->error_code = 0;
-						dev_info(xavier_dev->dev, "Xavier : Boot handshake done !\n");
+						if (strcmp(xavier_dev->version, XAVIER_CUR_VERSION))
+							dev_warn(xavier_dev->dev, "Warning : Firmware mismatch current drivers support %s", XAVIER_CUR_VERSION);
+						dev_info(xavier_dev->dev, "Boot handshake done !\n");
 					} else {
 						xavier_dev->error_code = buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK;
 						dev_dbg(xavier_dev->dev, "error code %d received\n",
@@ -847,7 +849,9 @@ static void xavier_interrupt_work(struct work_struct *work)
 			strncpy(xavier_dev->version, &buf[1], XAVIER_VERSION_SIZE);
 			xavier_dev->error_code = NO_ERROR; /* boot done we remove the error code */
 			xavier_dev->boot = 1;
-			dev_info(xavier_dev->dev, "Xavier : Boot handshake done !\n");
+			if (strcmp(xavier_dev->version, XAVIER_CUR_VERSION))
+				dev_warn(xavier_dev->dev, "Warning : Firmware mismatch current drivers support %s", XAVIER_CUR_VERSION);
+			dev_info(xavier_dev->dev, "Boot handshake done !\n");
 			/* Ask for the reson of the reset if any */
 
 			buf[0] = XAVIER_CONTROL_RESET_CAUSE << XAVIER_CONTROL_TYPE_SHIFT;
