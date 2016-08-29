@@ -39,7 +39,8 @@
 #define XAVIER_CONTROL_AVAILABLE_STATE 0x05
 #define XAVIER_CONTROL_RESET_CAUSE 0x06
 #define XAVIER_CONTROL_LED_ENA 0x07
-#define XAVIER_CONTROL_TYPE_SHIFT 5
+#define XAVIER_CONTROL_BRIGHT 0x08
+#define XAVIER_CONTROL_TYPE_SHIFT 4
 
 #define XAVIER_TYPE_MASK 0xE0
 #define XAVIER_CONTROL_ERROR_DATA_MASK 0x1F
@@ -66,8 +67,8 @@ struct xavier_dev {
 			int *child);
 	int (*write_dev)(struct xavier_dev *xavier, int size, const void *src,
 			 int child);
-	int (*input_handler)(struct platform_device *touch_dev,char *data,
-			     int size);
+	int (*input_handler)(struct platform_device *touch_dev, char *data,
+						 int size);
 	int irq;
 	int slave_int;
 	int reset_gpio;
@@ -85,6 +86,8 @@ struct xavier_dev {
 	int led_ena;
 	int ledctl;
 	int reset_cause;
+	int bright;
+	int bright_dur;
 	char version[XAVIER_VERSION_SIZE];
 	char cur_state[XAVIER_CUR_STATE_SIZE];
 };
