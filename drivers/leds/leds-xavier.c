@@ -31,26 +31,36 @@
 #include <linux/platform_device.h>
 
 
+#define XAVIER_NB_LED 12
+#define XAVIER_MCU_RAM_SIZE 10000
 
-#define XAVIER_LED_DELIMITERS " /n=,"
-#define XAVIER_LED_PLAY "PLAY"
-#define XAVIER_LED_PLAY_MONO "PLAY_MONO"
-#define XAVIER_LED_STOP "STOP\n"
-#define XAVIER_STATE_DATA_SIZE 24
 #define XAVIER_LED_ANIMATION_BUFFER_SIZE 1024
 #define XAVIER_LED_IDX_MASK 0x7F
 #define XAVIER_LED_FLASH_SHIFT_MASK 7
 #define XAVIER_LED_NB_ANIMATION_MASK 0x7F
-#define XAVIER_NB_LED 12
+
 #define XAVIER_LED_FLASH_PATTERN_SIZE ((5 * 2 * XAVIER_NB_LED + 8) / 8)
 #define XAVIER_LED_RAM_PATTERN_SIZE ((16 * 2 * XAVIER_NB_LED + 8) / 8)
+#define XAVIER_LED_DELIMITERS " /n=,"
+#define XAVIER_LED_PLAY "PLAY"
+#define XAVIER_LED_PLAY_MONO "PLAY_MONO"
+#define XAVIER_LED_STOP "STOP\n"
+#define XAVIER_LED_QUEUE "QUEUE"
+#define XAVIER_LED_QUEUE_MONO "QUEUE_MONO"
+#define XAVIER_STATE_DATA_SIZE 24
+#define XAVIER_STATE_LED_SHIFT 4
+#define XAVIER_STATE_MIRROR_SHIFT 3
+#define XAVIER_STATE_REVERSE_SHIFT 2
 #define XAVIER_LED_PLAY_STATE_IDX 0x00
-#define XAVIER_LED_PLAY_MONO_STATE_IDX 0x04
-#define XAVIER_LED_STOP_STATE_IDX 0x08
+#define XAVIER_LED_PLAY_MONO_STATE_IDX 0x02
+#define XAVIER_LED_STOP_STATE_IDX 0x04
+#define XAVIER_LED_QUEUE_STATE_IDX 0x06
+#define XAVIER_LED_QUEUE_STATE_MONO_IDX 0x08
 #define XAVIER_LED_DURATION_MSG_LENGTH 4
 #define XAVIER_LED_STATE_LIST_SIZE 25
 #define XAVIER_DURATION_SIZE 4
-#define XAVIER_MCU_RAM_SIZE 10000
+
+
 
 #define CEILING(x, y) (((x) + (y) - 1) / (y))
 
@@ -318,7 +328,7 @@ static ssize_t xavier_led_write(struct device *dev,
 			bytesleft -= XAVIER_I2C_MESSAGE_MAX_SIZE;
 		}
 	}
-	dev_info(xavier_dev->dev, "Xavier : Animation sucessfully sent\n");
+	dev_info(xavier_dev->dev, "Animation sucessfully sent\n");
 	ret = buf_size;
 
 error:
@@ -366,8 +376,8 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 {
 
 	struct xavier_dev *xavier_dev;
-	char *token, *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE];
-	unsigned int sequence, loop, red, green, blue;
+	char *token, *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE], *temp;
+	unsigned int sequence, loop, red, green, blue, shift, mirror, reverse;
 	int ret;
 
 	ret = 0;
@@ -398,16 +408,37 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 		}
 
 		/*If the command is a play command parse the 2 needed argument */
-		if (!strcmp(token, XAVIER_LED_PLAY)) {
+		if (!strcmp(token, XAVIER_LED_PLAY) || !strcmp(token, XAVIER_LED_QUEUE)) {
 
 			msg = xavier_new_token_data(msg, &sequence);
 			if (msg == NULL) {
-				dev_err(xavier_dev->dev, "%s - NULL token found\n", __func__);
+				dev_err(xavier_dev->dev, "%s - NULL token found (index)\n", __func__);
 				ret = -EINVAL;
 				goto error;
 			}
 
 			msg = xavier_new_token_data(msg, &loop);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (loop count)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &shift);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (shift)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &mirror);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (mirror)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &reverse);
 			if (msg != NULL) { /* must be the last token */
 				dev_err(xavier_dev->dev, "%s - NULL token found\n", __func__);
 				ret = -EINVAL;
@@ -416,11 +447,19 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 
 			/*Send the formated command to the MCU */
 			data[0] = XAVIER_CONTROL_CUR_STATE << XAVIER_CONTROL_TYPE_SHIFT; /* 0xE0(3bits) for idx */
-			data[0] += XAVIER_LED_PLAY_STATE_IDX; /*  0x18 (2bits) for play*/
+
+			if (!strcmp(token, XAVIER_LED_PLAY))
+				data[0] += XAVIER_LED_PLAY_STATE_IDX; /*  0x18 (2bits) for play*/
+			else
+				data[0] += XAVIER_LED_QUEUE_STATE_IDX; /*  0x18 (2bits) for play*/
+
 			data[1] |= sequence;
 			data[2] |= loop;
+			data[3] |= shift << XAVIER_STATE_LED_SHIFT;
+			data[3] |= mirror << XAVIER_STATE_MIRROR_SHIFT;
+			data[3] |= reverse << XAVIER_STATE_REVERSE_SHIFT;
 
-			ret = xavier_dev->write_dev(xavier_dev, 3,
+			ret = xavier_dev->write_dev(xavier_dev, 4,
 						    data, XAVIER_HEADER_CONTROL_ID);
 			if (ret < 0) {
 				ret = -EIO;
@@ -430,8 +469,8 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 			}
 		}
 
-		/*if Play_mono command parse the 4 needed argument */
-		else if (!strcmp(token, XAVIER_LED_PLAY_MONO)) {
+		/*if Play_mono command parse the needed argument */
+		else if (!strcmp(token, XAVIER_LED_PLAY_MONO) || !strcmp(token, XAVIER_LED_QUEUE_MONO)) {
 
 			msg = xavier_new_token_data(msg, &sequence);
 			if (msg == NULL) {
@@ -441,25 +480,24 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 				goto error;
 			}
 
-			token = strsep(&msg, XAVIER_LED_DELIMITERS);
+			temp = strsep(&msg, XAVIER_LED_DELIMITERS);
 			if (token == NULL) {
 				dev_err(xavier_dev->dev, "%s - Null token found\n", __func__);
 				goto error;
 			}
 
-			ret = kstrtoint(token, 0, &red);
-			if (ret) {
-				dev_err(xavier_dev->dev, "%s - Failed to transform data\n", __func__);
-				goto error;
-			}
-
-			if (token[1] == 'x' || token[1] == 'X') {
-
+			if (temp[1] == 'x' || temp[1] == 'X') {
 				green = red >> 5;
 				blue = red & 0x05;
 				red = red >> 10;
 
 			} else {
+
+				ret = kstrtoint(temp, 0, &red);
+				if (ret) {
+					dev_err(xavier_dev->dev, "%s - NULL token found (red)\n", __func__);
+					goto error;
+				}
 
 				msg = xavier_new_token_data(msg, &green);
 				if (msg == NULL) {
@@ -477,23 +515,52 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 			}
 
 			msg = xavier_new_token_data(msg, &loop);
-			if (msg != NULL) {  /* must be the last token */
+			if (msg == NULL) {
 				ret = -EINVAL;
 				dev_err(xavier_dev->dev, "%s - NULL token found (loop)\n", __func__);
 				goto error;
 			}
 
+			msg = xavier_new_token_data(msg, &shift);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (shift)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &mirror);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (mirror)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &reverse);
+			if (msg != NULL) { /* must be the last token */
+				dev_err(xavier_dev->dev, "%s - To many argument detected\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
 			/*Send the formated command to the MCU */
 			data[0] = XAVIER_CONTROL_CUR_STATE << XAVIER_CONTROL_TYPE_SHIFT; /* 0xE0(3bits) for idx */
-			data[0] += XAVIER_LED_PLAY_MONO_STATE_IDX; /* 0x18 (2bits) for play mono */
+
+			if (!strcmp(token, XAVIER_LED_PLAY_MONO))
+				data[0] += XAVIER_LED_PLAY_MONO_STATE_IDX;
+			else
+				data[0] += XAVIER_LED_QUEUE_STATE_MONO_IDX;
+
 			data[1] |= sequence;
 			data[2] |= (red << 2);
 			data[2] |= (green >> 3);
 			data[3] |= (green << 5);
 			data[3] |= blue;
 			data[4] |= loop;
+			data[5] |= shift << XAVIER_STATE_LED_SHIFT;
+			data[5] |= mirror << XAVIER_STATE_MIRROR_SHIFT;
+			data[5] |= reverse << XAVIER_STATE_REVERSE_SHIFT;
 
-			ret = xavier_dev->write_dev(xavier_dev, 5, data,
+			ret = xavier_dev->write_dev(xavier_dev, 6, data,
 						    XAVIER_HEADER_CONTROL_ID);
 			if (ret < 0) {
 				ret = -EIO;
