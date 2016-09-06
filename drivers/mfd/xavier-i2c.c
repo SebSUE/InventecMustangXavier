@@ -42,7 +42,6 @@
 #define XAVIER_MESSAGE_SIZE_SHIFT 2
 #define IRQ_TRIGGER IRQF_TRIGGER_FALLING
 #define XAVIER_FIRMWARE_MESSAGE_SIZE 32
-#define XAVIER_CONTROL_TYPE_SHIFT 5
 #define XAVIER_SLAVE_ADDRESS 0x12
 
 #define XAVIER_NB_CHILD_INTERFACE 3
@@ -54,13 +53,11 @@
 #define XAVIER_FIRMWARE_SIZE_SIZE 4 /* format of the size of the firmware */
 
 
-#define CEILING(x,y) (((x) + (y) - 1) / (y))
-
-
+#define CEILING(x, y) (((x) + (y) - 1) / (y))
 
 static const struct mfd_cell xavier_devs[] = {
-	{ .name = "Xavier-led" , },
-	{ .name = "Xavier-touch" , },
+	{ .name = "Xavier-led", },
+	{ .name = "Xavier-touch", },
 };
 
 static int xavier_i2c_read(struct xavier_dev *xavier, void *dest,
@@ -76,14 +73,14 @@ static int xavier_i2c_read(struct xavier_dev *xavier, void *dest,
 	/* Checking arguments values */
 	if (xavier == NULL || dest == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL pointer argument\n",
+		pr_err("Xavier : %s - NULL pointer argument\n",
 		       __func__);
 		goto error;
 	}
 
 	if (size <= 0) {
 		ret = -EINVAL;
-		printk(KERN_ERR "Xavier : %s - size must be > 0 : found %d\n",
+		dev_err(xavier->dev, "%s - size must be > 0 : found %d\n",
 		       __func__, size);
 		goto error;
 	}
@@ -91,7 +88,7 @@ static int xavier_i2c_read(struct xavier_dev *xavier, void *dest,
 	i2c = xavier->i2c;
 	if (i2c == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n",
+		dev_err(xavier->dev, "%s - NULL i2c device found\n",
 		       __func__);
 		goto error;
 	}
@@ -101,12 +98,12 @@ static int xavier_i2c_read(struct xavier_dev *xavier, void *dest,
 
 	ret = i2c_master_recv(i2c, buf, XAVIER_I2C_NB_DATA_BYTES + 1);
 	if (ret < 0) {
-		printk(KERN_ERR "Xavier : %s - failed to read device : %d\n",
+		dev_err(xavier->dev, "%s - failed to read device : %d\n",
 		       __func__, ret);
 		goto error_unlock;
 	}
 
-	dev_dbg(xavier->dev, "%s - data : \nXavier: %*ph\n",
+	dev_dbg(xavier->dev, "%s - data :\nXavier: %*ph\n",
 		__func__, XAVIER_I2C_NB_DATA_BYTES + 1, buf);
 
 	*child = buf[0] & XAVIER_MESSAGE_TYPE_MASK;
@@ -122,7 +119,7 @@ static int xavier_i2c_read(struct xavier_dev *xavier, void *dest,
 	/* Check if buffer is big enough for the data */
 	if (nbbytesleft > size) {
 		ret = -1;
-		printk(KERN_ERR "Xavier : %s - buffer too small: found %d needed %d\n",
+		dev_err(xavier->dev, "%s - buffer too small: found %d needed %d\n",
 		       __func__, size, nbbytesleft);
 		goto error_unlock;
 	}
@@ -134,11 +131,11 @@ static int xavier_i2c_read(struct xavier_dev *xavier, void *dest,
 	while (nbbytesleft > 0) {
 
 		ret = i2c_master_recv(i2c, buf, XAVIER_I2C_NB_DATA_BYTES + 1);
-		dev_dbg(xavier->dev, "%s - data : \nXavier:  %*ph\n",
+		dev_dbg(xavier->dev, "%s - data :\nXavier:  %*ph\n",
 			__func__, XAVIER_I2C_NB_DATA_BYTES + 1, buf);
 
 		if (ret < 0) {
-			printk(KERN_ERR "Xavier : %s - failed to read device : %d\n",
+			dev_err(xavier->dev, "%s - failed to read device : %d\n",
 			       __func__, ret);
 			goto error_unlock;
 		}
@@ -177,7 +174,7 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 	/*Checking arguments values */
 	if (xavier == NULL || src == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL pointer argument\n",
+		dev_err(xavier->dev, "%s - NULL pointer argument\n",
 		       __func__);
 		goto error;
 	}
@@ -185,14 +182,14 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 	i2c = xavier->i2c;
 	if (i2c == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n",
+		dev_err(xavier->dev, "%s - NULL i2c device found\n",
 		       __func__);
 		goto error;
 	}
 
 	if (bytes > XAVIER_I2C_MESSAGE_MAX_SIZE) {
 		ret = -EINVAL;
-		printk(KERN_ERR "Xavier : %s - Too much data to send : %d bytes (> %d)\n",
+		dev_err(xavier->dev, "%s - Too much data to send : %d bytes (> %d)\n",
 		       __func__, bytes, XAVIER_I2C_MESSAGE_MAX_SIZE);
 		goto error;
 
@@ -200,7 +197,7 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 
 	if (child < 0 || child > XAVIER_NB_CHILD_INTERFACE) {
 		ret = -EINVAL;
-		printk(KERN_ERR "Xavier : %s - wrong child argument : %d \n",
+		dev_err(xavier->dev, "%s - wrong child argument : %d\n",
 		       __func__, child);
 		goto error;
 
@@ -220,7 +217,7 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 		/* copy the data after the header*/
 		memcpy(&msg[1], cur_src, XAVIER_I2C_NB_DATA_BYTES);
 		ret += i2c_master_send(i2c, msg, XAVIER_I2C_NB_DATA_BYTES + 1);
-		dev_dbg(xavier->dev, "%s - data : \nXavier: %*ph\n",
+		dev_dbg(xavier->dev, "%s - data :\nXavier: %*ph\n",
 			__func__, XAVIER_I2C_NB_DATA_BYTES + 1, msg);
 		bytesleft = bytesleft - XAVIER_I2C_NB_DATA_BYTES;
 		cur_src += XAVIER_I2C_NB_DATA_BYTES;
@@ -228,7 +225,7 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 
 	/*send the last frame with padding if necessary */
 	msg[0] = 0;
-	msg[0] |= 0x80; //header frag bit
+	msg[0] |= 0x80; /*header frag bit */
 	msg[0] |= (nb32Words << XAVIER_MESSAGE_SIZE_SHIFT); /*header size bits*/
 	msg[0] |= child;    /*header type bits (control,led,touch)*/
 
@@ -244,19 +241,19 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 
 error:
 	return ret;
-
 }
 
 static irqreturn_t xavier_interrupt_handler(int irq, void *dev)
 {
 
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
+
 	if (xavier_dev == NULL) {
-		printk(KERN_ERR "Xavier : %s - NULL device found\n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL device found\n", __func__);
 		goto exit;
 	}
 
-	dev_dbg(xavier_dev->dev, "Interruption detected \n");
+	dev_dbg(xavier_dev->dev, "Interruption detected\n");
 
 	/*Workqueue needed as write and read can't be done in irq context */
 	queue_work(xavier_dev->workqueue, &xavier_dev->interrupt_work);
@@ -280,8 +277,8 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 	if (xavier_dev->reset_gpio == -1) {
 
 		ret = of_get_named_gpio(dev->of_node, "reset-gpio", 0);
-		if (ret < 0 ) {
-			printk(KERN_ERR "Xavier : %s - No gpio node found \n",
+		if (ret < 0) {
+			dev_err(xavier_dev->dev, "%s - No gpio node found\n",
 			       __func__);
 			ret = -EINVAL;
 			goto error;
@@ -291,31 +288,31 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 
 		ret = gpio_request(xavier_dev->reset_gpio, "xavier_reset");
 		if (ret) {
-			printk(KERN_ERR "Xavier : %s - Failed to request gpio %d\n",
+			dev_err(xavier_dev->dev, "%s - Failed to request gpio %d\n",
 			       __func__, xavier_dev->reset_gpio);
 			goto error;
 		}
 
 		ret = gpio_direction_output(xavier_dev->reset_gpio, 1);
 		if (ret) {
-			printk(KERN_ERR "Xavier : %s - Failed to set gpio direction\n",
+			dev_err(xavier_dev->dev, "%s - Failed to set gpio direction\n",
 			       __func__);
 			goto error;
 		}
 
 		/*export the gpio into sysfs */
-		gpio_export(xavier_dev->reset_gpio,true);
+		gpio_export(xavier_dev->reset_gpio, true);
 
 	}
 
 	/* Free irq to take control of the gpio */
 	free_irq(xavier_dev->irq, xavier_dev->dev);
 
-	if(flash) {
+	if (flash) {
 		/* Take control of the gpio */
 		ret = gpio_direction_output(xavier_dev->slave_int, 1);
 		if (ret) {
-			printk(KERN_ERR "Xavier : %s - Failed to set gpio direction\n",
+			dev_err(xavier_dev->dev, "%s - Failed to set gpio direction\n",
 			       __func__);
 			goto error;
 		}
@@ -328,21 +325,21 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 	/*force hardware reset */
 	gpio_set_value(xavier_dev->reset_gpio, 0);
 
-	dev_dbg(xavier_dev->dev, "%s - gpio  value :%d \n",
+	dev_dbg(xavier_dev->dev, "%s - gpio  value :%d\n",
 		__func__, gpio_get_value(xavier_dev->reset_gpio));
 
 
-	gpio_set_value(xavier_dev->reset_gpio,1);
-	dev_dbg(xavier_dev->dev, "%s - gpio  value :%d \n",
+	gpio_set_value(xavier_dev->reset_gpio, 1);
+	dev_dbg(xavier_dev->dev, "%s - gpio  value :%d\n",
 		__func__, gpio_get_value(xavier_dev->reset_gpio));
 
 
-	/* Flash need to retain control of the slave_int gpio until it's finish */
+	/* Flash need to retain control of the slave_int gpio until it's end */
 	if (!flash) {
 		/*release the GPIO for the MCU */
 		ret = gpio_direction_input(xavier_dev->slave_int);
 		if (ret) {
-			printk(KERN_ERR "Xavier : %s - Failed to set gpio direction\n",
+			dev_err(xavier_dev->dev, "%s - Failed to set gpio direction\n",
 			       __func__);
 			goto error;
 		}
@@ -351,7 +348,7 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 		ret = request_irq(xavier_dev->irq, xavier_interrupt_handler,
 				  IRQ_TRIGGER, "xavier", xavier_dev->dev);
 		if (ret) {
-			printk(KERN_ERR "Xavier : %s - Failed to request IRQ \n",
+			dev_err(xavier_dev->dev, "%s - Failed to request IRQ\n",
 			       __func__);
 			goto error;
 		}
@@ -381,7 +378,7 @@ static int xavier_mcu_flash(struct device *dev)
 
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL xavier device found \n",
+		dev_err(xavier_dev->dev, "%s - NULL xavier device found\n",
 		       __func__);
 		goto error;
 	}
@@ -390,7 +387,7 @@ static int xavier_mcu_flash(struct device *dev)
 	i2c = xavier_dev->i2c;
 	if (i2c == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n",
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n",
 		       __func__);
 		goto error;
 	}
@@ -402,7 +399,7 @@ static int xavier_mcu_flash(struct device *dev)
 	/* Open the firmware file */
 	firmfile = filp_open(XAVIER_MCU_FIRMWARE_PATH, O_RDONLY, 0);
 	if (IS_ERR(firmfile)) {
-		printk(KERN_ERR "Xavier : %s - Failed to open %s \n",
+		dev_err(xavier_dev->dev, "%s - Failed to open %s\n",
 		       __func__, XAVIER_MCU_FIRMWARE_PATH);
 		ret = -EIO;
 		goto error;
@@ -413,9 +410,8 @@ static int xavier_mcu_flash(struct device *dev)
 	size = ks.size;
 
 	/* The size need to be send MSB first */
-	for (i = 1; i <= XAVIER_FIRMWARE_SIZE_SIZE; i++) {
+	for (i = 1; i <= XAVIER_FIRMWARE_SIZE_SIZE; i++)
 		buffer[i - 1] = size >> (XAVIER_FIRMWARE_SIZE_SIZE - i) * 8;
-	}
 
 	i2c->addr = XAVIER_FIRMWARE_SLAVE_ADDRESS;
 	dev_dbg(xavier_dev->dev, "%s - size = %d (%x), buffer = %*ph",
@@ -425,7 +421,7 @@ static int xavier_mcu_flash(struct device *dev)
 	ret = i2c_master_send(i2c, buffer, XAVIER_FIRMWARE_SIZE_SIZE);
 
 	if (ret < 0) {
-		printk(KERN_ERR "Xavier : %s - Failed to send to device \n",
+		dev_err(xavier_dev->dev, "%s - Failed to send to device\n",
 		       __func__);
 		ret = -EIO;
 		goto exit;
@@ -445,7 +441,7 @@ static int xavier_mcu_flash(struct device *dev)
 		ret = vfs_read(firmfile, (char __user *)buffer,
 			       XAVIER_FIRMWARE_MESSAGE_SIZE, &pos);
 		if (ret < 0) {
-			printk(KERN_ERR "Xavier : %s - Failed to read the file\n",
+			dev_err(xavier_dev->dev, "%s - Failed to read the file\n",
 			       __func__);
 			set_fs(old_fs);
 			goto exit;
@@ -457,7 +453,7 @@ static int xavier_mcu_flash(struct device *dev)
 
 		ret = i2c_master_send(i2c, buffer, XAVIER_FIRMWARE_MESSAGE_SIZE);
 		if (ret < 0) {
-			printk(KERN_ERR "Xavier : %s - Failed to send to device ret = %d\n",
+			dev_err(xavier_dev->dev, "%s - Failed to send to device ret = %d\n",
 			       __func__, ret);
 			goto exit;
 		}
@@ -466,7 +462,7 @@ static int xavier_mcu_flash(struct device *dev)
 		do {
 			ret = i2c_master_recv(i2c, buffer, 1);
 			if (ret != -ETIMEDOUT && ret < 0) {
-				printk(KERN_ERR "Xavier : %s - failed to read device : %d\n",
+				dev_err(xavier_dev->dev, "%s - failed to read device : %d\n",
 				       __func__, ret);
 				goto exit;
 			}
@@ -474,7 +470,7 @@ static int xavier_mcu_flash(struct device *dev)
 
 
 		if (buffer[0] != XAVIER_FIRMWARE_VALIDATION) {
-			printk(KERN_ERR "Xavier : %s - Firmware flash failed - %s",
+			dev_err(xavier_dev->dev, "%s - Firmware flash failed - %s",
 			       __func__, buffer);
 		}
 		dev_dbg(xavier_dev->dev, "ACK received : %c\n",
@@ -487,7 +483,7 @@ exit:
 	filp_close(firmfile, NULL);
 	ret = gpio_direction_input(xavier_dev->slave_int);
 	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to set gpio direction\n",
+		dev_err(xavier_dev->dev, "%s - Failed to set gpio direction\n",
 		       __func__);
 		goto error;
 	}
@@ -496,7 +492,7 @@ exit:
 	ret = request_irq(xavier_dev->irq, xavier_interrupt_handler,
 			  IRQ_TRIGGER, "xavier", xavier_dev->dev);
 	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to request IRQ \n",
+		dev_err(xavier_dev->dev, "%s - Failed to request IRQ\n",
 		       __func__);
 		goto error;
 	}
@@ -511,6 +507,7 @@ static ssize_t xavier_reset_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const  char *buf, size_t count)
 {
+
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
@@ -541,6 +538,7 @@ static ssize_t xavier_flash_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const  char *buf, size_t count)
 {
+
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
@@ -558,7 +556,7 @@ static ssize_t xavier_flash_store(struct device *dev,
 		if (ret)
 			goto exit;
 		else
-			xavier_dev->reset = 0; 
+			xavier_dev->reset = 0;
 	}
 
 	return count;
@@ -575,9 +573,9 @@ static ssize_t xavier_boot_show(struct device *dev,
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
-	if (xavier_dev == NULL){
+	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR  "Xavier : %s - NULL structure found\n",
+		dev_err(xavier_dev->dev, "%s - NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
@@ -596,9 +594,9 @@ static ssize_t xavier_error_code_show(struct device *dev,
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
-	if (xavier_dev == NULL){
+	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR  "Xavier : %s - NULL structure found\n",
+		dev_err(xavier_dev->dev, "%s - NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
@@ -617,9 +615,9 @@ static ssize_t xavier_version_show(struct device *dev,
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
-	if (xavier_dev == NULL){
+	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR  "Xavier : %s, NULL structure found\n",
+		dev_err(xavier_dev->dev, "%s, NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
@@ -638,9 +636,9 @@ static ssize_t xavier_flash_show(struct device *dev,
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
-	if (xavier_dev == NULL){
+	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR  "Xavier : %s - NULL structure found\n",
+		dev_err(xavier_dev->dev, "%s - NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
@@ -658,9 +656,9 @@ static ssize_t xavier_reset_show(struct device *dev,
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
-	if (xavier_dev == NULL){
+	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR  "Xavier : %s - NULL structure found\n",
+		dev_err(xavier_dev->dev, "%s - NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
@@ -679,9 +677,9 @@ static ssize_t xavier_reset_cause_show(struct device *dev,
 	int ret;
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
-	if (xavier_dev == NULL){
+	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR  "Xavier : %s - NULL structure found\n",
+		dev_err(xavier_dev->dev, "%s - NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
@@ -700,7 +698,6 @@ static DEVICE_ATTR(flash, S_IWUSR | S_IRUSR, xavier_flash_show,
 static DEVICE_ATTR(reset, S_IWUSR | S_IRUSR, xavier_reset_show,
 		   xavier_reset_store);
 static DEVICE_ATTR(reset_cause, S_IRUSR, xavier_reset_cause_show, NULL);
-
 
 static struct attribute *xavier_attrs[] = {
 	&dev_attr_boot.attr,
@@ -725,41 +722,41 @@ static void xavier_interrupt_work(struct work_struct *work)
 	int child;
 
 	xavier_dev = container_of(work, struct xavier_dev, interrupt_work);
-	if (xavier_dev == NULL){
-		printk(KERN_ERR  "Xavier : %s - NULL structure found\n",
+	if (xavier_dev == NULL) {
+		dev_err(xavier_dev->dev, "%s - NULL structure found\n",
 		       __func__);
 		goto exit;
 	}
 
 	ret = xavier_i2c_read(xavier_dev, buf, XAVIER_VERSION_SIZE, &child);
-	if (ret < 0){
-		printk(KERN_ERR  "Xavier : %s - failed to read : %d\n",
+	if (ret < 0) {
+		dev_err(xavier_dev->dev, "%s - failed to read : %d\n",
 		       __func__, ret);
 		goto exit;
 	}
 
-	dev_dbg(xavier_dev->dev, "event detected \n");
+	dev_dbg(xavier_dev->dev, "event detected\n");
 	/*if it's a control header it must be an error_code or the version */
 	if (child == XAVIER_HEADER_CONTROL_ID) {
 
 		/*type code are in MSB so we need to shift them */
-		if ((buf[0] >> XAVIER_CONTROL_TYPE_SHIFT) == XAVIER_CONTROL_ERROR_CODE){
+		if ((buf[0] >> XAVIER_CONTROL_TYPE_SHIFT) == XAVIER_CONTROL_ERROR_CODE) {
 
 
-			switch(buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK) {
+			switch (buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK) {
 
-			case NO_ERROR :
+			case NO_ERROR:
 
-				dev_dbg(xavier_dev->dev, "NO_ERROR received \n");
+				dev_dbg(xavier_dev->dev, "NO_ERROR received\n");
 
 				/* no error mean the host has reboot */
 				if (xavier_dev->boot == 0) {
-					dev_dbg(xavier_dev->dev, "Boot handshake started \n");
+					dev_dbg(xavier_dev->dev, "Boot handshake started\n");
 					buf[0] = XAVIER_CONTROL_VERSION << XAVIER_CONTROL_TYPE_SHIFT;
 					ret = xavier_i2c_write(xavier_dev, 1,
 							       buf, 0);
 					if (ret < 0) {
-						printk(KERN_ERR  "Xavier : %s - failed to write : %d\n",
+						dev_err(xavier_dev->dev, "%s - failed to write : %d\n",
 						       __func__, ret);
 						goto exit;
 					}
@@ -767,8 +764,8 @@ static void xavier_interrupt_work(struct work_struct *work)
 					ret = xavier_i2c_read(xavier_dev,
 							      buf,
 							      XAVIER_VERSION_SIZE, &child);
-					if (ret < 0 || child != XAVIER_HEADER_CONTROL_ID){
-						printk(KERN_ERR  "Xavier : %s - failed to read : %d\n",
+					if (ret < 0 || child != XAVIER_HEADER_CONTROL_ID) {
+						dev_err(xavier_dev->dev, "%s - failed to read : %d\n",
 						       __func__, ret);
 						goto exit;
 					}
@@ -777,7 +774,9 @@ static void xavier_interrupt_work(struct work_struct *work)
 						strncpy(xavier_dev->version, &buf[1], XAVIER_VERSION_SIZE);
 						xavier_dev->boot = 1;
 						xavier_dev->error_code = 0;
-						printk(KERN_INFO  "Xavier : Boot handshake done !\n");
+						if (strcmp(xavier_dev->version, XAVIER_CUR_VERSION))
+							dev_warn(xavier_dev->dev, "Warning : Firmware mismatch current drivers support %s", XAVIER_CUR_VERSION);
+						dev_info(xavier_dev->dev, "Boot handshake done !\n");
 					} else {
 						xavier_dev->error_code = buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK;
 						dev_dbg(xavier_dev->dev, "error code %d received\n",
@@ -789,7 +788,7 @@ static void xavier_interrupt_work(struct work_struct *work)
 				}
 				break;
 
-			case BOOT_NOT_DONE :
+			case BOOT_NOT_DONE:
 
 				dev_dbg(xavier_dev->dev, "BOOT_NOT_DONE event received\n");
 				xavier_dev->boot = 0;
@@ -797,7 +796,7 @@ static void xavier_interrupt_work(struct work_struct *work)
 				buf[0] = XAVIER_CONTROL_VERSION << XAVIER_CONTROL_TYPE_SHIFT;
 				ret = xavier_i2c_write(xavier_dev, 1, buf, 0);
 				if (ret < 0) {
-					printk(KERN_ERR  "Xavier : %s - failed to write : %d\n",
+					dev_err(xavier_dev->dev, "%s - failed to write : %d\n",
 					       __func__, ret);
 					goto exit;
 				}
@@ -820,7 +819,7 @@ static void xavier_interrupt_work(struct work_struct *work)
 					goto exit;
 				break;
 
-			case ERROR_IPC :
+			case ERROR_IPC:
 
 				dev_dbg(xavier_dev->dev, "Error IPC received\n");
 				ret = xavier_mcu_reset(xavier_dev->dev, false);
@@ -828,7 +827,7 @@ static void xavier_interrupt_work(struct work_struct *work)
 					goto exit;
 				break;
 
-			case ERROR_WDT :
+			case ERROR_WDT:
 
 				dev_dbg(xavier_dev->dev, "Error WDT received\n");
 				ret = xavier_mcu_reset(xavier_dev->dev, false);
@@ -837,7 +836,7 @@ static void xavier_interrupt_work(struct work_struct *work)
 
 				break;
 
-			default :
+			default:
 
 				dev_dbg(xavier_dev->dev, "Error code %d received\n",
 					buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK);
@@ -850,26 +849,26 @@ static void xavier_interrupt_work(struct work_struct *work)
 			strncpy(xavier_dev->version, &buf[1], XAVIER_VERSION_SIZE);
 			xavier_dev->error_code = NO_ERROR; /* boot done we remove the error code */
 			xavier_dev->boot = 1;
-			printk(KERN_INFO "Xavier : Boot handshake done !\n");
+			if (strcmp(xavier_dev->version, XAVIER_CUR_VERSION))
+				dev_warn(xavier_dev->dev, "Warning : Firmware mismatch current drivers support %s", XAVIER_CUR_VERSION);
+			dev_info(xavier_dev->dev, "Boot handshake done !\n");
 			/* Ask for the reson of the reset if any */
 
 			buf[0] = XAVIER_CONTROL_RESET_CAUSE << XAVIER_CONTROL_TYPE_SHIFT;
 			ret = xavier_i2c_write(xavier_dev, 1, buf, 0);
 			if (ret < 0) {
-				printk(KERN_ERR  "Xavier : %s - failed to write : %d\n", __func__, ret);
+				dev_err(xavier_dev->dev, "%s - failed to write : %d\n", __func__, ret);
 				goto exit;
 			}
 
 			ret = xavier_i2c_read(xavier_dev, buf, XAVIER_VERSION_SIZE, &child);
-			if (ret < 0){
-				printk(KERN_ERR  "Xavier : %s - failed to read : %d\n", __func__, ret);
+			if (ret < 0) {
+				dev_err(xavier_dev->dev, "%s - failed to read : %d\n", __func__, ret);
 				goto exit;
 			}
 
-			if ((buf[0] >> XAVIER_CONTROL_TYPE_SHIFT) == XAVIER_CONTROL_RESET_CAUSE) {
+			if ((buf[0] >> XAVIER_CONTROL_TYPE_SHIFT) == XAVIER_CONTROL_RESET_CAUSE)
 				xavier_dev->reset_cause = buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK;
-			}
-
 
 			/*reset data to default */
 			xavier_dev->led_ena = 1;
@@ -880,7 +879,7 @@ static void xavier_interrupt_work(struct work_struct *work)
 
 	} else if (child == XAVIER_HEADER_TOUCH_ID) {
 
-		dev_dbg(xavier_dev->dev, "Touch event detected \n");
+		dev_dbg(xavier_dev->dev, "Touch event detected\n");
 		/*  if touch driver has been init do the input handler */
 		if (xavier_dev->input_handler != NULL &&
 		    xavier_dev->touch_dev != NULL)
@@ -888,38 +887,37 @@ static void xavier_interrupt_work(struct work_struct *work)
 						  buf, ret);
 	}
 
-
 exit: ;
 }
 
-static int xavier_probe(struct i2c_client * i2c, const struct i2c_device_id *id)
+static int xavier_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 {
+
 	struct xavier_dev *xavier;
 	int gpio;
 	int ret;
 
-	printk(KERN_INFO "Xavier : Beginning xavier Probe\n");
+	dev_info(&i2c->dev, "Beginning xavier Probe\n");
 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_SMBUS_BYTE_DATA
 				     | I2C_FUNC_SMBUS_I2C_BLOCK)){
 		ret = -EIO;
-		printk(KERN_ERR "Xavier : %s - failed to create workqueue\n",
+		dev_err(&i2c->dev, "%s - failed to create workqueue\n",
 		       __func__);
 		goto error;
 	}
 
-
 	/* Init the Xavier mfd device */
 	xavier = devm_kzalloc(&i2c->dev, sizeof(struct xavier_dev), GFP_KERNEL);
-	if (!xavier){
+	if (!xavier) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "Xavier : %s - failed to allocate device structure \n",
+		dev_err(&i2c->dev, "%s - failed to allocate device structure\n",
 		       __func__);
 		goto error;
 	}
 
 	/* Search for device node in the dtb */
 	if (!i2c->dev.of_node) {
-		printk(KERN_ERR "Xavier : %s - No device node detected\n",
+		dev_err(&i2c->dev, "%s - No device node detected\n",
 		       __func__);
 		ret = -EINVAL;
 		goto error;
@@ -927,8 +925,8 @@ static int xavier_probe(struct i2c_client * i2c, const struct i2c_device_id *id)
 
 	/* retrieve the gpio node from the dtb */
 	ret = of_get_named_gpio(i2c->dev.of_node, "gpio", 0);
-	if (ret < 0 ) {
-		printk(KERN_ERR "Xavier : %s - No gpio node found \n", __func__);
+	if (ret < 0) {
+		dev_err(&i2c->dev, "%s - No gpio node found\n", __func__);
 		ret = -EINVAL;
 		goto error;
 	}
@@ -938,15 +936,15 @@ static int xavier_probe(struct i2c_client * i2c, const struct i2c_device_id *id)
 		gpio, gpio_get_value(gpio));
 
 	ret = gpio_request(gpio, "xavier_slave_int");
-	if (ret){
-		printk(KERN_ERR "Xavier : %s - Failed to request GPIO %d\n",
+	if (ret) {
+		dev_err(&i2c->dev, "%s - Failed to request GPIO %d\n",
 		       __func__, gpio);
 		goto error;
 	}
 
 	ret = gpio_direction_input(gpio);
-	if (ret){
-		printk(KERN_ERR "Xavier : %s - Failed to set gpio direction\n",
+	if (ret) {
+		dev_err(&i2c->dev, "%s - Failed to set gpio direction\n",
 		       __func__);
 		goto error;
 	}
@@ -970,7 +968,7 @@ static int xavier_probe(struct i2c_client * i2c, const struct i2c_device_id *id)
 	/* Create control sysfs files */
 	ret = sysfs_create_group(&xavier->dev->kobj, &xavier_attr_group);
 	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to create sysfs :%d\n",
+		dev_err(xavier->dev, "%s - Failed to create sysfs :%d\n",
 		       __func__, ret);
 		goto error;
 	}
@@ -979,7 +977,7 @@ static int xavier_probe(struct i2c_client * i2c, const struct i2c_device_id *id)
 	xavier->workqueue = create_workqueue("Xavier_queue");
 	if (xavier->workqueue == NULL) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "Xavier : %s - Failed to create workqueue\n",
+		dev_err(xavier->dev, "%s - Failed to create workqueue\n",
 		       __func__);
 		goto error;
 	}
@@ -994,15 +992,17 @@ static int xavier_probe(struct i2c_client * i2c, const struct i2c_device_id *id)
 	xavier->ledctl =  0;
 	xavier->led_ena = 1;
 	xavier->reset_cause = 0;
-	strcpy(xavier->version," ");
+	xavier->bright = 31;
+	xavier->bright_dur = 0;
+	strcpy(xavier->version, " ");
 	strcpy(xavier->cur_state, " ");
 
 	i2c_set_clientdata(i2c, xavier);
 
 	ret = request_irq(xavier->irq, xavier_interrupt_handler,
 			  IRQ_TRIGGER, "Xavier", xavier->dev);
-	if (ret){
-		printk(KERN_ERR "Xavier : %s - Failed to request IRQ \n",
+	if (ret) {
+		dev_err(xavier->dev, "%s - Failed to request IRQ\n",
 		       __func__);
 		goto error;
 	}
@@ -1018,15 +1018,24 @@ error:
 
 static int xavier_remove(struct i2c_client *i2c)
 {
+
 	struct xavier_dev *xavier;
-	printk(KERN_INFO "Xavier : Removing xavier device\n");
+
 	xavier = i2c_get_clientdata(i2c);
+	if (xavier == NULL) {
+		pr_err("Xavier : %s - NULL pointer found\n",
+			__func__);
+		goto exit;
+	}
+
+	dev_info(xavier->dev, "Removing xavier device\n");
 	sysfs_remove_group(&xavier->dev->kobj, &xavier_attr_group);
 	free_irq(xavier->irq, xavier->dev);
 	flush_workqueue(xavier->workqueue);
 	gpio_free(xavier->irq);
 	destroy_workqueue(xavier->workqueue);
 	mfd_remove_devices(xavier->dev);
+exit:
 	return 0;
 }
 
@@ -1040,7 +1049,7 @@ static struct of_device_id xavier_of_match[] = {
 	{ .compatible = "Xavier"},
 	{ },
 };
-MODULE_DEVICE_TABLE(of,xavier_of_match);
+MODULE_DEVICE_TABLE(of, xavier_of_match);
 
 static struct i2c_driver xavier_i2c_driver = {
 	.driver = {
@@ -1054,7 +1063,7 @@ static struct i2c_driver xavier_i2c_driver = {
 
 static int __init xavier_init(void)
 {
-	printk(KERN_INFO "Xavier : Beginning xavier device initialisation\n");
+	pr_err("Xavier : Beginning xavier device initialisation\n");
 	return i2c_add_driver(&xavier_i2c_driver);
 
 }

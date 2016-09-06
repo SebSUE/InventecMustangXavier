@@ -31,28 +31,38 @@
 #include <linux/platform_device.h>
 
 
+#define XAVIER_NB_LED 12
+#define XAVIER_MCU_RAM_SIZE 10000
 
-#define XAVIER_LED_DELIMITERS " /n=,"
-#define XAVIER_LED_PLAY "PLAY"
-#define XAVIER_LED_PLAY_MONO "PLAY_MONO"
-#define XAVIER_LED_STOP "STOP\n"
-#define XAVIER_STATE_DATA_SIZE 24
 #define XAVIER_LED_ANIMATION_BUFFER_SIZE 1024
 #define XAVIER_LED_IDX_MASK 0x7F
 #define XAVIER_LED_FLASH_SHIFT_MASK 7
 #define XAVIER_LED_NB_ANIMATION_MASK 0x7F
-#define XAVIER_NB_LED 12
-#define XAVIER_LED_FLASH_PATTERN_SIZE ((5 * 2 * XAVIER_NB_LED + 8) /8)
+
+#define XAVIER_LED_FLASH_PATTERN_SIZE ((5 * 2 * XAVIER_NB_LED + 8) / 8)
 #define XAVIER_LED_RAM_PATTERN_SIZE ((16 * 2 * XAVIER_NB_LED + 8) / 8)
-#define XAVIER_LED_PLAY_STATE_IDX 0x00;
-#define XAVIER_LED_PLAY_MONO_STATE_IDX 0x08
-#define XAVIER_LED_STOP_STATE_IDX 0x10
+#define XAVIER_LED_DELIMITERS " /n=,"
+#define XAVIER_LED_PLAY "PLAY"
+#define XAVIER_LED_PLAY_MONO "PLAY_MONO"
+#define XAVIER_LED_STOP "STOP\n"
+#define XAVIER_LED_QUEUE "QUEUE"
+#define XAVIER_LED_QUEUE_MONO "QUEUE_MONO"
+#define XAVIER_STATE_DATA_SIZE 24
+#define XAVIER_STATE_LED_SHIFT 4
+#define XAVIER_STATE_MIRROR_SHIFT 3
+#define XAVIER_STATE_REVERSE_SHIFT 2
+#define XAVIER_LED_PLAY_STATE_IDX 0x00
+#define XAVIER_LED_PLAY_MONO_STATE_IDX 0x02
+#define XAVIER_LED_STOP_STATE_IDX 0x04
+#define XAVIER_LED_QUEUE_STATE_IDX 0x06
+#define XAVIER_LED_QUEUE_STATE_MONO_IDX 0x08
 #define XAVIER_LED_DURATION_MSG_LENGTH 4
 #define XAVIER_LED_STATE_LIST_SIZE 25
 #define XAVIER_DURATION_SIZE 4
-#define XAVIER_MCU_RAM_SIZE 10000
 
-#define CEILING(x,y) (((x) + (y) - 1) / (y))
+
+
+#define CEILING(x, y) (((x) + (y) - 1) / (y))
 
 
 struct animations {
@@ -74,8 +84,8 @@ struct xavier_led {
 };
 
 static ssize_t xavier_led_write(struct device *dev,
-                                struct device_attribute *attr,
-                                const char *buf, size_t buf_size)
+				struct device_attribute *attr,
+				const char *buf, size_t buf_size)
 {
 
 	int i;
@@ -97,23 +107,23 @@ static ssize_t xavier_led_write(struct device *dev,
 
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n",
+			__func__);
 		goto exit;
 	}
 
 	xavier_led = platform_get_drvdata(xavier_dev->led_dev);
 	if (xavier_led == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL LED device found \n",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - NULL LED device found\n",
+			__func__);
 		goto exit;
 	}
 
 	anims = &xavier_led->anims;
 	if (!xavier_dev->boot) {
-		printk(KERN_ERR "Xavier : %s - can't send data, MCU boot is not done\n",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - can't send data, MCU boot is not done\n",
+			__func__);
 		ret = -EIO;
 		goto error;
 	}
@@ -123,8 +133,8 @@ static ssize_t xavier_led_write(struct device *dev,
 	if (xavier_dev->ledctl == 1) {
 
 		if (buf_size != XAVIER_NB_LED * 2) {
-			printk(KERN_ERR "Xavier : %s - Wrong data size\n",
-			       __func__);
+			dev_err(xavier_dev->dev, "%s - Wrong data size\n",
+				__func__);
 			ret = -EINVAL;
 			xavier_dev->error_code = ERROR_LED_MSG;
 			goto error;
@@ -134,8 +144,8 @@ static ssize_t xavier_led_write(struct device *dev,
 					    XAVIER_HEADER_LED_ID);
 		if (ret < 0) {
 			ret = -EIO;
-			printk(KERN_ERR "Xavier : %s - Failed to write to the device \n",
-			       __func__);
+			dev_err(xavier_dev->dev, "%s - Failed to write to the device\n",
+				__func__);
 			goto error;
 		}
 	} else {
@@ -174,12 +184,13 @@ static ssize_t xavier_led_write(struct device *dev,
 			offset++;
 		}
 		/* Check every animation to be sure that the file
-		   correspond to a led animation file */
+		 * correspond to a led animation file
+		 */
 		for (i = anims->cur_animation; i < anims->nb_animation; i++) {
 
 			if (buf_it == NULL) {
-				printk(KERN_ERR "Xavier : %s - Wrong binary data formating, NULL pointer found\n",
-				       __func__);
+				dev_err(xavier_dev->dev, "%s - Wrong binary data formating, NULL pointer found\n",
+					__func__);
 				ret = -EINVAL;
 				xavier_dev->error_code = ERROR_LED_MSG;
 				goto error;
@@ -187,8 +198,9 @@ static ssize_t xavier_led_write(struct device *dev,
 
 			if (anims->cur_pattern == 0) {
 				/* if there is not enough space for the begining
-				   of an animation (idx + nb_pattern + first pattern)
-				   copy everything and leave the loop */
+				 * of an animation (idx + nb_pattern + first pattern)
+				 * copy everything and leave the loop
+				 */
 				if (offset + (2 + anims->pattern_size) > PAGE_SIZE) {
 					if (anims->buffer == NULL)
 						anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
@@ -208,8 +220,8 @@ static ssize_t xavier_led_write(struct device *dev,
 
 				/*idx must be in the right order allowing easier structure checking */
 				if (idx != i) {
-					printk(KERN_ERR "Xavier : %s - Wrong binary data formating : found %d needed %d\n",
-					       __func__, idx ,i);
+					dev_err(xavier_dev->dev, "%s - Wrong binary data formating : found %d needed %d\n",
+						__func__, idx, i);
 					ret = -EINVAL;
 					xavier_dev->error_code = ERROR_LED_MSG;
 					goto error;
@@ -228,15 +240,16 @@ static ssize_t xavier_led_write(struct device *dev,
 					anims->pattern_size, buf_it + 1);
 
 				/* if there is not enough space for a pattern
-				   copy everything and leave the loop */
+				 * copy everything and leave the loop
+				 */
 				if (offset + anims->pattern_size > PAGE_SIZE) {
 					if (anims->buffer == NULL)
 						anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
 					memoffset = anims->nb_fragment * PAGE_SIZE;
 
 					if (memoffset + PAGE_SIZE > XAVIER_MCU_RAM_SIZE) {
-						printk(KERN_ERR "Xavier : %s - Data to big for MCU RAM %lu > %d\n",
-						       __func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
+						dev_err(xavier_dev->dev, "%s - Data to big for MCU RAM %lu > %d\n",
+							__func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
 						ret = -EINVAL;
 						xavier_dev->error_code = ERROR_LED_MSG;
 						goto error;
@@ -257,13 +270,12 @@ static ssize_t xavier_led_write(struct device *dev,
 			buf_it++;
 			offset++;
 
-
 			if (anims->buffer == NULL)
 				anims->buffer = kzalloc(XAVIER_MCU_RAM_SIZE, GFP_KERNEL);
 			memoffset = anims->nb_fragment * PAGE_SIZE;
 			if (memoffset + buf_size > XAVIER_MCU_RAM_SIZE) {
-				printk(KERN_ERR "Xavier : %s - Data to big for MCU RAM %lu > %d\n",
-				       __func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
+				dev_err(xavier_dev->dev, "%s - Data to big for MCU RAM %lu > %d\n",
+					__func__, memoffset + PAGE_SIZE, XAVIER_MCU_RAM_SIZE);
 				ret = -EINVAL;
 				xavier_dev->error_code = ERROR_LED_MSG;
 				goto error;
@@ -278,13 +290,13 @@ static ssize_t xavier_led_write(struct device *dev,
 		/*compute the number of message necessary for the data */
 		memoffset = anims->nb_fragment * PAGE_SIZE + buf_size - 1;
 		if (anims->data_size !=  memoffset) {
-			printk(KERN_ERR "Xavier : %s - File size mismatch : found %d should be %d\n", __func__, memoffset, anims->data_size);
+			dev_err(xavier_dev->dev, "%s - File size mismatch : found %d should be %d\n", __func__, memoffset, anims->data_size);
 			ret = -EINVAL;
 			xavier_dev->error_code = ERROR_LED_MSG;
 			goto error;
 		}
 
-		nb_message = CEILING(anims->nb_fragment* PAGE_SIZE + buf_size,
+		nb_message = CEILING(anims->nb_fragment * PAGE_SIZE + buf_size,
 				     XAVIER_I2C_MESSAGE_MAX_SIZE);
 
 		/* The first message is the number of message to be sent */
@@ -292,7 +304,7 @@ static ssize_t xavier_led_write(struct device *dev,
 					    XAVIER_HEADER_LED_ID);
 		if (ret < 0) {
 			ret = -EIO;
-			printk(KERN_ERR "Xavier : %s - Failed to send to device\n", __func__);
+			dev_err(xavier_dev->dev, "%s - Failed to send to device\n", __func__);
 			goto error;
 		}
 
@@ -310,13 +322,13 @@ static ssize_t xavier_led_write(struct device *dev,
 			}
 			if (ret < 0) {
 				ret = -EIO;
-				printk(KERN_ERR "Xavier : %s - Failed to send to device\n", __func__);
+				dev_err(xavier_dev->dev, "%s - Failed to send to device\n", __func__);
 				goto error;
 			}
 			bytesleft -= XAVIER_I2C_MESSAGE_MAX_SIZE;
 		}
 	}
-	printk(KERN_INFO "Xavier : Animation sucessfully sent\n");
+	dev_info(xavier_dev->dev, "Animation sucessfully sent\n");
 	ret = buf_size;
 
 error:
@@ -333,10 +345,9 @@ error:
 	anims->pattern_size = 0;
 exit:
 	return ret;
-
 }
 
-static char*  xavier_new_token_data(char *msg, unsigned int *data)
+static char *xavier_new_token_data(char *msg, unsigned int *data)
 {
 
 	char *token;
@@ -344,13 +355,13 @@ static char*  xavier_new_token_data(char *msg, unsigned int *data)
 
 	token = strsep(&msg, XAVIER_LED_DELIMITERS);
 	if (token == NULL) {
-		printk(KERN_ERR "Xavier : %s - Null token found \n", __func__);
+		pr_err("Xavier : %s - Null token found\n", __func__);
 		goto error;
 	}
 
 	ret = kstrtoint(token, 0, data);
 	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to transform data \n", __func__);
+		pr_err("Xavier : %s - Failed to transform data\n", __func__);
 		goto error;
 	}
 	return msg;
@@ -365,15 +376,15 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 {
 
 	struct xavier_dev *xavier_dev;
-	char *token, *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE];
-	unsigned int sequence, loop, red, green, blue;
+	char *token, *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE], *temp;
+	unsigned int sequence, loop, red, green, blue, shift, mirror, reverse;
 	int ret;
 
 	ret = 0;
 	xavier_dev = dev_get_drvdata(dev);
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
 		goto exit;
 	}
 
@@ -382,116 +393,174 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 
 		memset(data, 0, XAVIER_STATE_DATA_SIZE);
 
-		/*copy the buf to work with it
-		  msg is the working pointer
-		  memmsg is the memory pointer for the kfree */
+		/* copy the buf to work with it
+		 * msg is the working pointer
+		 * memmsg is the memory pointer for the kfree
+		 */
 		msg = memmsg = kstrdup(buf, GFP_KERNEL);
 
 		/*Parse the receive command */
 		token = strsep(&msg, XAVIER_LED_DELIMITERS);
 		if (token == NULL) {
 			ret = -EINVAL;
-			printk(KERN_ERR "Xavier : %s - NULL token found \n", __func__);
+			dev_err(xavier_dev->dev, "%s - NULL token found\n", __func__);
 			goto error;
 		}
 
 		/*If the command is a play command parse the 2 needed argument */
-		if (!strcmp(token, XAVIER_LED_PLAY)) {
+		if (!strcmp(token, XAVIER_LED_PLAY) || !strcmp(token, XAVIER_LED_QUEUE)) {
 
 			msg = xavier_new_token_data(msg, &sequence);
 			if (msg == NULL) {
-				printk(KERN_ERR "Xavier : %s - NULL token found \n", __func__);
+				dev_err(xavier_dev->dev, "%s - NULL token found (index)\n", __func__);
 				ret = -EINVAL;
 				goto error;
 			}
 
 			msg = xavier_new_token_data(msg, &loop);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (loop count)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &shift);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (shift)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &mirror);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (mirror)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &reverse);
 			if (msg != NULL) { /* must be the last token */
-				printk(KERN_ERR "Xavier : %s - NULL token found \n", __func__);
+				dev_err(xavier_dev->dev, "%s - NULL token found\n", __func__);
 				ret = -EINVAL;
 				goto error;
 			}
 
 			/*Send the formated command to the MCU */
-			data[0] = XAVIER_CONTROL_CUR_STATE << 5; /* 0xE0(3bits) for idx */
-			data[0] += XAVIER_LED_PLAY_STATE_IDX; /*  0x18 (2bits) for play*/
+			data[0] = XAVIER_CONTROL_CUR_STATE << XAVIER_CONTROL_TYPE_SHIFT; /* 0xE0(3bits) for idx */
+
+			if (!strcmp(token, XAVIER_LED_PLAY))
+				data[0] += XAVIER_LED_PLAY_STATE_IDX; /*  0x18 (2bits) for play*/
+			else
+				data[0] += XAVIER_LED_QUEUE_STATE_IDX; /*  0x18 (2bits) for play*/
+
 			data[1] |= sequence;
 			data[2] |= loop;
+			data[3] |= shift << XAVIER_STATE_LED_SHIFT;
+			data[3] |= mirror << XAVIER_STATE_MIRROR_SHIFT;
+			data[3] |= reverse << XAVIER_STATE_REVERSE_SHIFT;
 
-			ret = xavier_dev->write_dev(xavier_dev, 3,
+			ret = xavier_dev->write_dev(xavier_dev, 4,
 						    data, XAVIER_HEADER_CONTROL_ID);
 			if (ret < 0) {
 				ret = -EIO;
-				printk(KERN_ERR "Xavier : %s - Failed to write to the device\n",
-				       __func__);
+				dev_err(xavier_dev->dev, "%s - Failed to write to the device\n",
+					__func__);
 				goto error;
 			}
 		}
 
-		/*if Play_mono command parse the 4 needed argument */
-		else if (!strcmp(token, XAVIER_LED_PLAY_MONO)) {
+		/*if Play_mono command parse the needed argument */
+		else if (!strcmp(token, XAVIER_LED_PLAY_MONO) || !strcmp(token, XAVIER_LED_QUEUE_MONO)) {
 
 			msg = xavier_new_token_data(msg, &sequence);
 			if (msg == NULL) {
 				ret = -EINVAL;
-				printk(KERN_ERR "Xavier : %s - NULL token found (sequence) \n",
+				dev_err(xavier_dev->dev, "%s - NULL token found (sequence)\n",
 				       __func__);
 				goto error;
 			}
 
-			token = strsep(&msg, XAVIER_LED_DELIMITERS);
+			temp = strsep(&msg, XAVIER_LED_DELIMITERS);
 			if (token == NULL) {
-				printk(KERN_ERR "Xavier : %s - Null token found \n", __func__);
+				dev_err(xavier_dev->dev, "%s - Null token found\n", __func__);
 				goto error;
 			}
 
-			ret = kstrtoint(token, 0, &red);
-			if (ret) {
-				printk(KERN_ERR "Xavier : %s - Failed to transform data \n", __func__);
-				goto error;
-			}
-
-			if (token[1] == 'x' || token[1] == 'X') {
-
+			if (temp[1] == 'x' || temp[1] == 'X') {
 				green = red >> 5;
 				blue = red & 0x05;
 				red = red >> 10;
 
 			} else {
 
+				ret = kstrtoint(temp, 0, &red);
+				if (ret) {
+					dev_err(xavier_dev->dev, "%s - NULL token found (red)\n", __func__);
+					goto error;
+				}
+
 				msg = xavier_new_token_data(msg, &green);
 				if (msg == NULL) {
 					ret = -EINVAL;
-					printk(KERN_ERR "Xavier : %s - NULL token found (green)\n", __func__);
+					dev_err(xavier_dev->dev, "%s - NULL token found (green)\n", __func__);
 					goto error;
 				}
 
 				msg = xavier_new_token_data(msg, &blue);
 				if (msg == NULL) {
 					ret = -EINVAL;
-					printk(KERN_ERR "Xavier : %s - NULL token found (blue)\n", __func__);
+					dev_err(xavier_dev->dev, "%s - NULL token found (blue)\n", __func__);
 					goto error;
 				}
 			}
 
 			msg = xavier_new_token_data(msg, &loop);
-			if (msg != NULL) {  /* must be the last token */
+			if (msg == NULL) {
 				ret = -EINVAL;
-				printk(KERN_ERR "Xavier : %s - NULL token found (loop)\n", __func__);
+				dev_err(xavier_dev->dev, "%s - NULL token found (loop)\n", __func__);
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &shift);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (shift)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &mirror);
+			if (msg == NULL) {
+				dev_err(xavier_dev->dev, "%s - NULL token found (mirror)\n", __func__);
+				ret = -EINVAL;
+				goto error;
+			}
+
+			msg = xavier_new_token_data(msg, &reverse);
+			if (msg != NULL) { /* must be the last token */
+				dev_err(xavier_dev->dev, "%s - To many argument detected\n", __func__);
+				ret = -EINVAL;
 				goto error;
 			}
 
 			/*Send the formated command to the MCU */
-			data[0] = XAVIER_CONTROL_CUR_STATE << 5; /* 0xE0(3bits) for idx */
-			data[0] += XAVIER_LED_PLAY_MONO_STATE_IDX; /* 0x18 (2bits) for play mono */
+			data[0] = XAVIER_CONTROL_CUR_STATE << XAVIER_CONTROL_TYPE_SHIFT; /* 0xE0(3bits) for idx */
+
+			if (!strcmp(token, XAVIER_LED_PLAY_MONO))
+				data[0] += XAVIER_LED_PLAY_MONO_STATE_IDX;
+			else
+				data[0] += XAVIER_LED_QUEUE_STATE_MONO_IDX;
+
 			data[1] |= sequence;
 			data[2] |= (red << 2);
 			data[2] |= (green >> 3);
 			data[3] |= (green << 5);
 			data[3] |= blue;
 			data[4] |= loop;
+			data[5] |= shift << XAVIER_STATE_LED_SHIFT;
+			data[5] |= mirror << XAVIER_STATE_MIRROR_SHIFT;
+			data[5] |= reverse << XAVIER_STATE_REVERSE_SHIFT;
 
-			ret = xavier_dev->write_dev(xavier_dev, 5, data,
+			ret = xavier_dev->write_dev(xavier_dev, 6, data,
 						    XAVIER_HEADER_CONTROL_ID);
 			if (ret < 0) {
 				ret = -EIO;
@@ -500,18 +569,18 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 			}
 		} else if (!strcmp(token, XAVIER_LED_STOP)) {
 
-			data[0] = XAVIER_CONTROL_CUR_STATE << 5; /* 0xE0(3bits) for idx */
+			data[0] = XAVIER_CONTROL_CUR_STATE << XAVIER_CONTROL_TYPE_SHIFT; /* 0xE0(3bits) for idx */
 			data[0] += XAVIER_LED_STOP_STATE_IDX; /* 0x18 (2bits) for stop */
 			ret = xavier_dev->write_dev(xavier_dev, 1,
 						    data, XAVIER_HEADER_CONTROL_ID);
 			if (ret < 0) {
 				ret = -EIO;
-				printk(KERN_ERR "Xavier : %s - Failed to write to the device\n",
-				       __func__);
+				dev_err(xavier_dev->dev, "%s - Failed to write to the device\n",
+					__func__);
 				goto error;
 			}
 		} else {
-			printk(KERN_ERR "Xavier : %s - Wrong argument detected\n", __func__);
+			dev_err(xavier_dev->dev, "%s - Wrong argument detected\n", __func__);
 			ret = -EINVAL;
 			goto error;
 		}
@@ -519,7 +588,7 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 		strcpy(xavier_dev->cur_state, buf);
 		return count;
 
-	error :
+error:
 		kfree(memmsg);
 
 	}
@@ -539,7 +608,7 @@ static ssize_t xavier_cur_state_show(struct device *dev,
 	xavier_dev = dev_get_drvdata(dev);
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
 		goto exit;
 	}
 
@@ -559,8 +628,8 @@ static ssize_t xavier_ledctl_show(struct device *dev,
 	xavier_dev = dev_get_drvdata(dev);
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n",
+			__func__);
 		goto exit;
 	}
 
@@ -580,7 +649,7 @@ static ssize_t xavier_led_ena_show(struct device *dev,
 	xavier_dev = dev_get_drvdata(dev);
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
 		goto exit;
 	}
 
@@ -595,21 +664,21 @@ static ssize_t xavier_available_state_show(struct device *dev,
 					   char *buf)
 {
 
-	int i,j,k,idx,ret,nb_idx,nb_message,child,buf_size;
+	int i, j, k, idx, ret, nb_idx, nb_message, child, buf_size;
 	unsigned int duration;
 	struct xavier_dev *xavier_dev  = dev_get_drvdata(dev);
-	char data[XAVIER_I2C_NB_DATA_BYTES],*animation_buffer,*buf_it,temp[50];
+	char data[XAVIER_I2C_NB_DATA_BYTES], *animation_buffer, *buf_it, temp[50];
 
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
 		goto exit;
 	}
 
 	if (xavier_dev->boot == 0) {
 		ret = -1;
-		printk(KERN_ERR "Xavier : %s - available_state access impossible - boot not done\n",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - available_state access impossible - boot not done\n",
+			__func__);
 		goto exit;
 	}
 
@@ -618,7 +687,7 @@ static ssize_t xavier_available_state_show(struct device *dev,
 	ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
 	if (ret < 0) {
 		ret = -EIO;
-		printk(KERN_ERR "Xavier : %s - Failed to write to the device\n", __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to write to the device\n", __func__);
 		goto exit;
 	}
 
@@ -628,7 +697,7 @@ static ssize_t xavier_available_state_show(struct device *dev,
 
 	if (ret <= 0 || child != XAVIER_HEADER_CONTROL_ID) {
 		ret = -EIO;
-		printk(KERN_ERR "Xavier : %s - Failed to read the device\n", __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to read the device\n", __func__);
 		goto exit;
 	}
 
@@ -636,7 +705,7 @@ static ssize_t xavier_available_state_show(struct device *dev,
 		xavier_dev->error_code = (data[0] &
 					  XAVIER_CONTROL_ERROR_DATA_MASK);
 		ret = -EIO;
-		printk(KERN_ERR "Xavier : %s - Error code received\n", __func__);
+		dev_err(xavier_dev->dev, "%s - Error code received\n", __func__);
 		goto exit;
 	}
 
@@ -648,8 +717,8 @@ static ssize_t xavier_available_state_show(struct device *dev,
 
 	if (animation_buffer == NULL) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "Xavier : %s - Failed to allocate animation buffer",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to allocate animation buffer\n",
+			__func__);
 		goto exit;
 	}
 
@@ -658,7 +727,7 @@ static ssize_t xavier_available_state_show(struct device *dev,
 		ret = xavier_dev->read_dev(xavier_dev, animation_buffer, buf_size, &child);
 		if (ret <= 0 || child != XAVIER_HEADER_CONTROL_ID) {
 			ret = -EIO;
-			printk(KERN_ERR "Xavier : %s - Failed to read the device\n", __func__);
+			dev_err(xavier_dev->dev, "%s - Failed to read the device\n", __func__);
 			goto error;
 		}
 
@@ -666,13 +735,13 @@ static ssize_t xavier_available_state_show(struct device *dev,
 			xavier_dev->error_code = (animation_buffer[0] &
 						  XAVIER_CONTROL_ERROR_DATA_MASK);
 			ret = -EIO;
-			printk(KERN_ERR "Xavier : %s - Error code received\n", __func__);
+			dev_err(xavier_dev->dev, "%s - Error code received\n", __func__);
 			goto error;
 		}
 
 		buf_it = animation_buffer;
-		sprintf(temp, "Current animation (duration in 10 ms steps) : \n");
-		strcat(buf,temp);
+		sprintf(temp, "Current animation (duration in 10 ms steps) :\n");
+		strcat(buf, temp);
 		/*Parse and store the reply */
 		for (i = 0; i < nb_idx; i++) {
 
@@ -684,11 +753,10 @@ static ssize_t xavier_available_state_show(struct device *dev,
 				duration = 0;
 
 				/* the duration is in 32 bits word */
-				for (k = 1; k <= XAVIER_DURATION_SIZE; k++) {
+				for (k = 1; k <= XAVIER_DURATION_SIZE; k++)
 					duration += buf_it[k] << (XAVIER_DURATION_SIZE - k) * 8;
-				}
 
-				sprintf(temp, "duration = %d \n", duration);
+				sprintf(temp, "duration = %d\n", duration);
 				strcat(buf, temp);
 				buf_it += XAVIER_LED_DURATION_MSG_LENGTH + 1;
 			}
@@ -716,23 +784,24 @@ static ssize_t xavier_led_ena_store(struct device *dev,
 
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+
+	ret = kstrtoint(buf, 0, &temp);
+	if (ret) {
+		dev_err(xavier_dev->dev, "%s - Failed to transform data\n", __func__);
 		goto exit;
 	}
 
 	data = XAVIER_CONTROL_LED_ENA << XAVIER_CONTROL_TYPE_SHIFT;
-	data += buf[0] << 4; /*3 bits for control idx (0) then 1 bit for the value */
-
-	ret = kstrtoint(buf, 0, &temp);
-	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to transform data \n", __func__);
-		goto exit;
-	}
+	data += temp << (XAVIER_CONTROL_TYPE_SHIFT - 1); /*3 bits for control idx (0) then 1 bit for the value */
 
 	if (temp != 0 &&  temp != 1) {
 		ret = -EINVAL;
-		printk(KERN_ERR "Xavier : %s - Wrong value must be 1 or 0 : found %d\n",
-		       __func__, temp);
+		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
+			__func__, temp);
 		goto exit;
 	}
 
@@ -742,7 +811,7 @@ static ssize_t xavier_led_ena_store(struct device *dev,
 	ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
 	if (ret < 0) {
 		ret = -EIO;
-		printk(KERN_ERR "Xavier : %s - Failed to write to the device\n", __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to write to the device\n", __func__);
 		goto exit;
 	}
 
@@ -765,24 +834,24 @@ static ssize_t xavier_ledctl_store(struct device *dev,
 
 	if (xavier_dev == NULL) {
 		ret = -EFAULT;
-		printk(KERN_ERR "Xavier : %s - NULL i2c device found \n", __func__);
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
 		goto exit;
 	}
 
-	data = buf[0] << 4;
 	ret = kstrtoint(buf, 0, &temp);
-
 	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to transform data \n", __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to transform data\n", __func__);
 		goto exit;
 	}
 
 	if (temp != 0 &&  temp != 1) {
 		ret = -EINVAL;
-		printk(KERN_ERR "Xavier : %s - Wrong value must be 1 or 0 : found %d\n",
+		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
 		       __func__, temp);
 		goto exit;
 	}
+
+	data = temp << (XAVIER_CONTROL_TYPE_SHIFT - 1);
 
 	xavier_dev->ledctl = temp;
 	xavier_dev->error_code = 0;
@@ -791,7 +860,7 @@ static ssize_t xavier_ledctl_store(struct device *dev,
 	ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
 	if (ret < 0) {
 		ret = -EIO;
-		printk(KERN_ERR "Xavier : %s - Failed to write to the device\n", __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to write to the device\n", __func__);
 		goto exit;
 	}
 
@@ -801,16 +870,101 @@ exit:
 	return ret;
 }
 
+
+static ssize_t xavier_bright_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+
+	int ret;
+	struct xavier_dev *xavier_dev;
+
+	xavier_dev = dev_get_drvdata(dev);
+	if (xavier_dev == NULL) {
+		ret = -EFAULT;
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+	ret = sprintf(buf, "%d %d\n", xavier_dev->bright, xavier_dev->bright_dur);
+
+exit:
+	return ret;
+}
+
+
+static ssize_t xavier_bright_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const  char *buf, size_t count)
+{
+
+	struct xavier_dev *xavier_dev;
+	char *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE];
+	int ret, bright, duration;
+
+	ret = 0;
+	xavier_dev = dev_get_drvdata(dev);
+	if (xavier_dev == NULL) {
+		ret = -EFAULT;
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+	/*Check if MCU is booted and Led are enabled */
+	if (xavier_dev->led_ena && xavier_dev->boot) {
+
+		memset(data, 0, XAVIER_STATE_DATA_SIZE);
+
+		/* copy the buf to work with it
+		 * msg is the working pointer
+		 * memmsg is the memory pointer for the kfree
+		 */
+		msg = memmsg = kstrdup(buf, GFP_KERNEL);
+
+		msg = xavier_new_token_data(msg, &bright);
+		if (msg == NULL) {
+			ret = -EINVAL;
+			dev_err(xavier_dev->dev, "%s - NULL token found (bright)\n", __func__);
+			goto error;
+		}
+
+		msg = xavier_new_token_data(msg, &duration);
+
+		/*Send the formated command to the MCU */
+		data[0] = XAVIER_CONTROL_BRIGHT << XAVIER_CONTROL_TYPE_SHIFT; /* 0xE0(3bits) for idx */
+		data[1] |= bright;
+		data[2] |= duration;
+
+		ret = xavier_dev->write_dev(xavier_dev, 3,
+					    data, XAVIER_HEADER_CONTROL_ID);
+		if (ret < 0) {
+			ret = -EIO;
+			dev_err(xavier_dev->dev, "%s - Failed to write to the device\n",
+				__func__);
+				goto error;
+		}
+	kfree(memmsg);
+	}
+
+	return count;
+error:
+	kfree(memmsg);
+exit:
+	return ret;
+}
+
+
 static DEVICE_ATTR(cur_state, S_IWUSR | S_IRUSR, xavier_cur_state_show,
 		   xavier_cur_state_store);
 static DEVICE_ATTR(ledctl, S_IWUSR | S_IRUSR, xavier_ledctl_show,
 		   xavier_ledctl_store);
 static DEVICE_ATTR(LED_ena, S_IWUSR | S_IRUSR, xavier_led_ena_show,
 		   xavier_led_ena_store);
-static DEVICE_ATTR(available_state,S_IRUSR, xavier_available_state_show,
+static DEVICE_ATTR(available_state, S_IRUSR, xavier_available_state_show,
 		   NULL);
-static DEVICE_ATTR(send_state, S_IWUSR | S_IRUSR , NULL,
+static DEVICE_ATTR(send_state, S_IWUSR | S_IRUSR, NULL,
 		   xavier_led_write);
+static DEVICE_ATTR(bright, S_IWUSR | S_IRUSR, xavier_bright_show,
+		   xavier_bright_store);
 
 static struct attribute *xavier_attrs[] = {
 	&dev_attr_cur_state.attr,
@@ -818,6 +972,7 @@ static struct attribute *xavier_attrs[] = {
 	&dev_attr_LED_ena.attr,
 	&dev_attr_available_state.attr,
 	&dev_attr_send_state.attr,
+	&dev_attr_bright.attr,
 	NULL
 };
 
@@ -832,14 +987,13 @@ static int xavier_led_probe(struct platform_device *pdev)
 	struct xavier_led *xavier_led;
 	int ret;
 
-	printk(KERN_INFO "Xavier : Xavier LED started\n");
-
 	xavier_dev = dev_get_drvdata(pdev->dev.parent);
+	dev_info(xavier_dev->dev, "Xavier LED started\n");
 	xavier_led = kzalloc(sizeof(struct xavier_led), GFP_KERNEL);
 	if (!xavier_led) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "Xavier : %s - Failed to allocate animation buffer",
-		       __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to allocate animation buffer",
+			__func__);
 		goto error;
 	}
 
@@ -849,7 +1003,7 @@ static int xavier_led_probe(struct platform_device *pdev)
 
 	ret = sysfs_create_group(&xavier_led->mfd->dev->kobj, &xavier_attr_group);
 	if (ret) {
-		printk(KERN_ERR "Xavier : %s - Failed to create sysfs entries\n", __func__);
+		dev_err(xavier_dev->dev, "%s - Failed to create sysfs entries\n", __func__);
 		goto exit;
 	}
 
@@ -867,7 +1021,8 @@ static int xavier_led_remove(struct platform_device *pdev)
 {
 
 	struct xavier_led *xavier_led = platform_get_drvdata(pdev);
-	sysfs_remove_group (&xavier_led->mfd->dev->kobj, &xavier_attr_group);
+
+	sysfs_remove_group(&xavier_led->mfd->dev->kobj, &xavier_attr_group);
 	kfree(xavier_led);
 	return 0;
 }
