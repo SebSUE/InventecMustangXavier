@@ -85,4 +85,12 @@ config MAILBOX_TEST
 	  Test client to help with testing new Controller driver
 	  implementations.
 
+config CYGNUS_MBOX
+	bool "Cygnus Mailbox"
+	depends on ARCH_BCM_CYGNUS
+	help
+	  The Broadcom Cygnus SoC has an always on Cortex-M0 MCU processor that
+	  handles support for power, clock, and reset management. The Cygnus
+	  mailbox controller handles all communication with this processor.
+
 endif
