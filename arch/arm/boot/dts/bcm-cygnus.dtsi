@@ -122,6 +122,11 @@
 			#mbox-cells = <1>;
 		};
 
+		cygnus-reset {
+			compatible = "brcm,cygnus-reset";
+			mboxes = <&mailbox 0>;
+		};
+
 		gpio_crmu: gpio@03024800 {
 			compatible = "brcm,cygnus-crmu-gpio";
 			reg = <0x03024800 0x50>,
