@@ -1,0 +1,73 @@
+Broadcom Cygnus Power Management device tree bindings
+
+Cygnus power management support allows for system entering and exiting
+power savings states. Power management is enabled by a low-power
+co-processor dedicated to Power Management.
+
+Required SoC Specific Properties:
+- compatible: should be "brcm,cygnus-pm"
+
+Optional SoC Specific Properties:
+- aon_regulators: A sub-root node containing child aon_regulator nodes
+  describing AON regulators, which need to be externally disabled while in
+  certain PM states
+- aon_regulators node has the following properties:
+	- Required properties
+		- gpio: gpio to use for enable control
+	- Optional properties:
+		- startup-delay-us: startup time in microseconds
+		  If this property is missing, the default assumed is 0.
+		- enable-active-high: Polarity of GPIO is Active high
+		  If this property is missing, the default assumed is Active low
+		- regulator-state-standby sub-root node for Standby
+		  (Cygnus sleep) mode
+		  : standby, the device is in a power-saving state, but can also
+		  receive certain events, specific behavior depends on the
+		  specific device.
+		- regulator-state-mem sub-root node for Suspend-to-RAM
+		  (Cygnus deepsleep) mode
+		  : suspend to memory, the device goes to sleep, but all data
+		  stored in memory, only some external interrupt can wake the
+		  device.
+		- regulator-state-mem sub-root node for Cygnus OFF mode
+		  : poweroff, the core part of the device is powered off, only
+		  some external interrupt can wake the PM co-processor;
+		  the device goes through a full boot on wakeup.
+		  If this node is missing, regulator state is not modified upon
+		  entering and exiting the corresponding PM state.
+		- regulator-state-[standby/mem/off] node has the following
+		  common properties:
+			- regulator-external-off-in-suspend: regulator should be
+			  disabled by a PM co-processor while in the
+			  corresponding PM state.
+			  If this property is missing, regulator state is not
+			  modified upon entering and exiting a PM state.
+
+Example:
+
+/ {
+	cygnus-pm {
+		compatible = "brcm,cygnus-pm";
+
+		aon_regulators {
+			a_regulator {
+				gpio = <&gpio_x 1 0>;
+				startup-delay-us = <50000>;
+				enable-active-high;
+				regulator-state-mem {
+					regulator-external-off-in-suspend;
+				};
+				regulator-state-off {
+					regulator-external-off-in-suspend;
+				};
+			};
+			b_regulator {
+				gpio = <&gpio_x 4 0>;
+				regulator-state-off {
+					regulator-external-off-in-suspend;
+				};
+			};
+		};
+
+	};
+};

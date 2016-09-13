@@ -1,0 +1,10 @@
+config BCM_CYGNUS_PM
+	bool "IPROC PM support"
+	depends on ARCH_BCM_CYGNUS
+	depends on PM
+	default n
+	help
+	  iProc SoCs power managemet support.
+	  If unsure, say N.
+
+

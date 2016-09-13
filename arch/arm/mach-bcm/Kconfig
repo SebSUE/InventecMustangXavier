@@ -170,3 +170,4 @@ config ARCH_BRCMSTB
 	  including the 7445 family of chips.
 
 endif
+source arch/arm/mach-bcm/bcm_cygnus_pm/Kconfig

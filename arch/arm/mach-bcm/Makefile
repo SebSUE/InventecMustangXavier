@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 
 # Cygnus
-obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
+obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o bcm_iproc_smc.o
 
 # Northstar Plus
 obj-$(CONFIG_ARCH_BCM_NSP) += bcm_nsp.o
@@ -51,3 +51,5 @@ CFLAGS_platsmp-brcmstb.o	+= -march=armv7-a
 obj-y				+= brcmstb.o
 obj-$(CONFIG_SMP)		+= platsmp-brcmstb.o
 endif
+
+obj-$(CONFIG_BCM_CYGNUS_PM) += bcm_cygnus_pm/
