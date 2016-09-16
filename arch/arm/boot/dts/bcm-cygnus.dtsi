@@ -112,7 +112,6 @@
 			};
 		};
 
-
 		mailbox: mailbox@3024024 {
 			compatible = "brcm,cygnus-mailbox";
 			reg = <0x03024024 0x40>;
@@ -122,9 +121,14 @@
 			#mbox-cells = <1>;
 		};
 
+		cygnus-pm {
+			compatible = "brcm,cygnus-pm";
+			mboxes = <&mailbox 0>;
+		};
+
 		cygnus-reset {
 			compatible = "brcm,cygnus-reset";
-			mboxes = <&mailbox 0>;
+			mboxes = <&mailbox 1>;
 		};
 
 		gpio_crmu: gpio@03024800 {
@@ -133,6 +137,11 @@
 			      <0x03024008 0x18>;
 			#gpio-cells = <2>;
 			gpio-controller;
+			interrupt-controller;
+			interrupt-parent = <&mailbox>;
+			interrupts = <0>;
+			mboxes = <&mailbox 3>;
+
 		};
 
 /* -------------------------

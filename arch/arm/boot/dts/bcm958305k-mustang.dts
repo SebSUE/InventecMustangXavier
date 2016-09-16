@@ -48,6 +48,17 @@
 		stdout-path = "serial0:115200n8";
 	};
 
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		power {
+			label = "power";
+			gpios = <&gpio_crmu 0 0>;
+			linux,code = <116>;
+			wakeup-source;
+		};
+	};
+
 	sound {
 		compatible = "bcm,cygnus-hoka-machine";
 		bcm,cygnus-pcm = <&cygnus_audio>;
