@@ -93,58 +93,6 @@ static iproc_pm_device_regs_t iproc_pm_dev_common = {
 	.write = iproc_reg32_write,
 };
 
-static void iproc_pm_flush_disable_l1_caches(void)
-{
-	dev_info(iproc_pm->dev, "Flush & disable L1 caches!\n");
-	dsb();
-	isb();
-
-	iproc_pm_flush_disable_L1_D_cache();
-}
-
-#ifdef CONFIG_CACHE_L2X0
-static struct {
-	unsigned int tram_ctrl;
-	unsigned int dram_ctrl;
-	unsigned int filt_end;
-	unsigned int filt_start;
-	unsigned int prefetch_offs;
-	unsigned int pwr_ctrl;
-	unsigned int aux_control;
-	unsigned int control;
-} saved_l2c_regs;
-
-static void iproc_pm_l2c_regs_save(void)
-{
-	dev_info(iproc_pm->dev, "Saving L2C registers\n");
-	saved_l2c_regs.tram_ctrl = iproc_reg32_read(IHOST_L2C_TAG_RAM_CTRL);
-	saved_l2c_regs.dram_ctrl = iproc_reg32_read(IHOST_L2C_DATA_RAM_CTRL);
-	saved_l2c_regs.filt_end = iproc_reg32_read(IHOST_L2C_FILT_END);
-	saved_l2c_regs.filt_start = iproc_reg32_read(IHOST_L2C_FILT_START);
-	saved_l2c_regs.prefetch_offs =
-		iproc_reg32_read(IHOST_L2C_PREFETCH_OFFS);
-	saved_l2c_regs.pwr_ctrl = iproc_reg32_read(IHOST_L2C_PWR_CTRL);
-	saved_l2c_regs.aux_control = iproc_reg32_read(IHOST_L2C_AUX_CONTROL);
-	saved_l2c_regs.control = iproc_reg32_read(IHOST_L2C_CONTROL);
-}
-
-static void iproc_pm_l2c_regs_restore(void)
-{
-	dev_info(iproc_pm->dev, "Restoring L2C registers\n");
-	iproc_reg32_write(IHOST_L2C_CONTROL, 0);
-	iproc_reg32_write(IHOST_L2C_TAG_RAM_CTRL, saved_l2c_regs.tram_ctrl);
-	iproc_reg32_write(IHOST_L2C_DATA_RAM_CTRL, saved_l2c_regs.dram_ctrl);
-	iproc_reg32_write(IHOST_L2C_FILT_END, saved_l2c_regs.filt_end);
-	iproc_reg32_write(IHOST_L2C_FILT_START, saved_l2c_regs.filt_start);
-	iproc_reg32_write(
-		IHOST_L2C_PREFETCH_OFFS, saved_l2c_regs.prefetch_offs);
-	iproc_reg32_write(IHOST_L2C_PWR_CTRL, saved_l2c_regs.pwr_ctrl);
-	iproc_reg32_write(IHOST_L2C_AUX_CONTROL, saved_l2c_regs.aux_control);
-///	outer_inv_all();
-	iproc_reg32_write(IHOST_L2C_CONTROL, saved_l2c_regs.control);
-}
-#endif
-
 static void iproc_pm_flush_disable_l2_cache(void)
 {
 #ifdef CONFIG_CACHE_L2X0
@@ -153,8 +101,7 @@ static void iproc_pm_flush_disable_l2_cache(void)
 		dsb();
 		isb();
 
-		/* l2x0_flush_all is called by l2x0_disable */
-		iproc_pm_l2c_regs_save();
+		/* Disable L2 cache */
 		outer_disable();
 	} else {
 		/* SMC to disable L2 cache and save its configuration */
@@ -168,8 +115,8 @@ static void iproc_pm_enable_l2_cache(void)
 #ifdef CONFIG_CACHE_L2X0
 	if (iproc_in_secure_mode()) {
 		dev_info(iproc_pm->dev,
-			"Invalidate L2 cache before enabling it!\n");
-		iproc_pm_l2c_regs_restore();
+			"Resume L2 cache.\n");
+		outer_resume();
 	} else {
 		/* SMC to enable L2 cache and restore its configuration */
 		bcm_iproc_smc(SSAPI_ENABLE_L2_CACHE, 0, ~0UL, 0, 0);
@@ -556,10 +503,6 @@ void iproc_dump_resume_entry(void)
 /*common operation after wakeup*/
 static void iproc_pm_common_task_after_wakeup(void)
 {
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	dev_info(iproc_pm->dev, "Re-enable L1 D cache\n");
-	iproc_pm_enable_L1_D_cache();
-#endif
 
 	iproc_set_scu_status(IPROC_PM_STATE_RUN);
 
@@ -629,8 +572,8 @@ static int __iproc_enter_sleep(enum iproc_power_status state)
 	/* Save core regs, then suspending, wakeup in the __cpu_suspend() */
 	iproc_prepare_enter_target_pm_mode(state);
 
+	flush_cache_all();
 	iproc_pm_flush_disable_l2_cache();
-	iproc_pm_flush_disable_l1_caches();
 
 	dev_info(iproc_pm->dev, "Suspending ...\n");
 
