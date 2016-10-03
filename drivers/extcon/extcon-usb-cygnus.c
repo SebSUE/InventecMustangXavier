@@ -28,6 +28,9 @@
 #define USB_CONNECTED			1
 #define USB_DISCONNECTED		0
 
+/* Fixme: vbus_enable_gpio should be handled by regulator */
+#define CONFIG_ARCH_BCM_INVENTEC 1
+
 struct bcm_usb_data {
 	struct extcon_dev *edev;
 	struct gpio_desc *vbus_gpio;
