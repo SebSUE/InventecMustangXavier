@@ -30,7 +30,6 @@
 #include <linux/sysfs.h>
 #include <linux/platform_device.h>
 
-
 #define XAVIER_NB_LED 12
 #define XAVIER_MCU_RAM_SIZE 10000
 
@@ -82,6 +81,41 @@ struct xavier_led {
 	struct xavier_dev *mfd;
 	struct animations anims;
 };
+
+static unsigned int convert_str_hex_to_int(const char* mstr)
+{
+	uint8_t i = 0, start = 0;
+	uint16_t res = 0;
+	size_t length = strlen(mstr);
+
+	if (mstr[0] == '0' && (mstr[1] == 'x' || mstr[1] == 'X'))
+	{
+		start = 2;
+	}
+	for (i = start ; i < length ; i++)
+	{
+		if (mstr[i] >= '0' && mstr[i] <= '9')
+		{
+			res *= 16;
+			res += mstr[i] - '0';
+		}
+		else if (mstr[i] >= 'A' && mstr[i] <= 'F')
+		{
+			res *= 16;
+			res += mstr[i] - 'A' + 10;
+		}
+		else if (mstr[i] >= 'a' && mstr[i] <= 'f')
+		{
+			res *= 16;
+			res += mstr[i] - 'a' + 10;
+		}
+		else if (mstr[i] == '\0' || mstr[i] == '\n' || mstr[i] == '\r')
+			return res;
+		else
+			return -1;
+	}
+	return res;
+}
 
 static ssize_t xavier_led_write(struct device *dev,
 				struct device_attribute *attr,
@@ -314,10 +348,10 @@ static ssize_t xavier_led_write(struct device *dev,
 
 			buf_it = anims->buffer + (i * XAVIER_I2C_MESSAGE_MAX_SIZE);
 			if (bytesleft < XAVIER_I2C_MESSAGE_MAX_SIZE) {
-				ret += xavier_dev->write_dev(xavier_dev, bytesleft,
+				ret = xavier_dev->write_dev(xavier_dev, bytesleft,
 							     buf_it, XAVIER_HEADER_LED_ID);
 			} else {
-				ret += xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
+				ret = xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
 							     buf_it, XAVIER_HEADER_LED_ID);
 			}
 			if (ret < 0) {
@@ -377,7 +411,7 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 
 	struct xavier_dev *xavier_dev;
 	char *token, *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE], *temp;
-	unsigned int sequence, loop, red, green, blue, shift, mirror, reverse;
+	unsigned int sequence, loop, red = 0, green, blue, shift, mirror, reverse;
 	int ret;
 
 	ret = 0;
@@ -487,8 +521,9 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 			}
 
 			if (temp[1] == 'x' || temp[1] == 'X') {
-				green = red >> 5;
-				blue = red & 0x05;
+				red = convert_str_hex_to_int(temp);
+				green = (red & 0x03E0) >> 5;
+				blue = red & 0x1F;
 				red = red >> 10;
 
 			} else {
@@ -951,7 +986,6 @@ error:
 exit:
 	return ret;
 }
-
 
 static DEVICE_ATTR(cur_state, S_IWUSR | S_IRUSR, xavier_cur_state_show,
 		   xavier_cur_state_store);
