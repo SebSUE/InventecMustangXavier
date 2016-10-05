@@ -30,7 +30,6 @@
 #include <linux/sysfs.h>
 #include <linux/platform_device.h>
 
-
 #define XAVIER_NB_LED 12
 #define XAVIER_MCU_RAM_SIZE 10000
 
@@ -82,6 +81,41 @@ struct xavier_led {
 	struct xavier_dev *mfd;
 	struct animations anims;
 };
+
+static unsigned int convert_str_hex_to_int(const char* mstr)
+{
+	uint8_t i = 0, start = 0;
+	uint16_t res = 0;
+	size_t length = strlen(mstr);
+
+	if (mstr[0] == '0' && (mstr[1] == 'x' || mstr[1] == 'X'))
+	{
+		start = 2;
+	}
+	for (i = start ; i < length ; i++)
+	{
+		if (mstr[i] >= '0' && mstr[i] <= '9')
+		{
+			res *= 16;
+			res += mstr[i] - '0';
+		}
+		else if (mstr[i] >= 'A' && mstr[i] <= 'F')
+		{
+			res *= 16;
+			res += mstr[i] - 'A' + 10;
+		}
+		else if (mstr[i] >= 'a' && mstr[i] <= 'f')
+		{
+			res *= 16;
+			res += mstr[i] - 'a' + 10;
+		}
+		else if (mstr[i] == '\0' || mstr[i] == '\n' || mstr[i] == '\r')
+			return res;
+		else
+			return -1;
+	}
+	return res;
+}
 
 static ssize_t xavier_led_write(struct device *dev,
 				struct device_attribute *attr,
@@ -314,10 +348,10 @@ static ssize_t xavier_led_write(struct device *dev,
 
 			buf_it = anims->buffer + (i * XAVIER_I2C_MESSAGE_MAX_SIZE);
 			if (bytesleft < XAVIER_I2C_MESSAGE_MAX_SIZE) {
-				ret += xavier_dev->write_dev(xavier_dev, bytesleft,
+				ret = xavier_dev->write_dev(xavier_dev, bytesleft,
 							     buf_it, XAVIER_HEADER_LED_ID);
 			} else {
-				ret += xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
+				ret = xavier_dev->write_dev(xavier_dev, XAVIER_I2C_MESSAGE_MAX_SIZE,
 							     buf_it, XAVIER_HEADER_LED_ID);
 			}
 			if (ret < 0) {
@@ -377,7 +411,7 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 
 	struct xavier_dev *xavier_dev;
 	char *token, *msg, *memmsg, data[XAVIER_STATE_DATA_SIZE], *temp;
-	unsigned int sequence, loop, red, green, blue, shift, mirror, reverse;
+	unsigned int sequence, loop, red = 0, green, blue, shift, mirror, reverse;
 	int ret;
 
 	ret = 0;
@@ -487,8 +521,9 @@ static ssize_t xavier_cur_state_store(struct device *dev,
 			}
 
 			if (temp[1] == 'x' || temp[1] == 'X') {
-				green = red >> 5;
-				blue = red & 0x05;
+				red = convert_str_hex_to_int(temp);
+				green = (red & 0x03E0) >> 5;
+				blue = red & 0x1F;
 				red = red >> 10;
 
 			} else {
@@ -851,7 +886,7 @@ static ssize_t xavier_ledctl_store(struct device *dev,
 		goto exit;
 	}
 
-	data = temp << (XAVIER_CONTROL_TYPE_SHIFT - 1);
+	data = temp << (XAVIER_CONTROL_TYPE_SHIFT - 3);
 
 	xavier_dev->ledctl = temp;
 	xavier_dev->error_code = 0;
@@ -952,6 +987,217 @@ exit:
 	return ret;
 }
 
+static ssize_t xavier_led_red_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+
+	int ret;
+	struct xavier_dev *xavier_dev;
+
+	xavier_dev = dev_get_drvdata(dev);
+	if (xavier_dev == NULL) {
+		ret = -EFAULT;
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+	ret = sprintf(buf, "%d \n", xavier_dev->led_red);
+
+exit:
+	return ret;
+}
+
+
+static ssize_t xavier_led_red_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const  char *buf, size_t count)
+{
+
+	char data;
+	int ret;
+	int temp;
+
+	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
+
+	if (xavier_dev == NULL) {
+		ret = -EFAULT;
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+	ret = kstrtoint(buf, 0, &temp);
+	if (ret) {
+		dev_err(xavier_dev->dev, "%s - Failed to transform data\n", __func__);
+		goto exit;
+	}
+
+	if (temp != 0 &&  temp != 1) {
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
+		       __func__, temp);
+		goto exit;
+	}
+
+	data = XAVIER_CONTROL_LED_RED | (temp << (XAVIER_CONTROL_TYPE_SHIFT - 3));
+
+	xavier_dev->led_red = temp;
+	xavier_dev->error_code = 0;
+
+	/*write the new value to MCU to make it ready */
+	ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
+	if (ret < 0) {
+		ret = -EIO;
+		dev_err(xavier_dev->dev, "%s - Failed to write to the device\n", __func__);
+		goto exit;
+	}
+	return count;
+exit:
+	return ret;
+}
+
+static ssize_t xavier_led_rgb_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+
+	int ret;
+	struct xavier_dev *xavier_dev;
+
+	xavier_dev = dev_get_drvdata(dev);
+	if (xavier_dev == NULL) {
+		ret = -EFAULT;
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+	switch (xavier_dev->led_rgb)
+	{
+		case 0:
+			ret = sprintf(buf, "0 0 0\n");
+		break;
+		case 1:
+			ret = sprintf(buf, "0 0 1\n");
+		break;
+		case 2:
+			ret = sprintf(buf, "0 1 0\n");
+		break;
+		case 3:
+			ret = sprintf(buf, "0 1 1\n");
+		break;
+		case 4:
+			ret = sprintf(buf, "1 0 0\n");
+		break;
+		case 5:
+			ret = sprintf(buf, "1 0 1\n");
+		break;
+		case 6:
+			ret = sprintf(buf, "1 1 0\n");
+		break;
+		case 7:
+			ret = sprintf(buf, "1 1 1\n");
+		break;
+		default:
+			ret = sprintf(buf, "0 0 0\n");
+		break;
+	}
+
+exit:
+	return ret;
+}
+
+
+static ssize_t xavier_led_rgb_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const  char *buf, size_t count)
+{
+
+	char data[2];
+	char* msg;
+	int ret;
+	char* temp;
+	unsigned int red = 0, green = 0, blue = 0;
+
+	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
+
+	if (xavier_dev == NULL) {
+		ret = -EFAULT;
+		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
+		goto exit;
+	}
+
+	memset(data, 0, 2);
+
+	/* copy the buf to work with it
+	 * msg is the working pointer
+	 * memmsg is the memory pointer for the kfree
+	 */
+	msg = kstrdup(buf, GFP_KERNEL);
+
+	temp = strsep(&msg, XAVIER_LED_DELIMITERS);
+	if (temp == NULL) {
+		dev_err(xavier_dev->dev, "%s - Null token found\n", __func__);
+		goto error;
+	}
+
+	ret = kstrtoint(temp, 0, &red);
+	if (ret) {
+		dev_err(xavier_dev->dev, "%s - NULL token found (red)\n", __func__);
+		goto error;
+	}
+	else if (red !=1 && red != 0)
+	{
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
+		       __func__, red);
+		goto exit;
+	}
+
+	msg = xavier_new_token_data(msg, &green);
+	if (msg == NULL) {
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - NULL token found (green)\n", __func__);
+		goto error;
+	}
+	else if (green !=1 && green != 0)
+	{
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
+		       __func__, green);
+		goto exit;
+	}
+
+	msg = xavier_new_token_data(msg, &blue);
+	if (msg != NULL) {
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - NULL token found (blue)\n", __func__);
+		goto error;
+	}
+	else if (blue !=1 && blue != 0)
+	{
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
+		       __func__, blue);
+		goto exit;
+	}
+	/*Send the formated command to the MCU */
+	data[0] = XAVIER_CONTROL_LED_RGB;
+	data[1] = (red << 2) | (green << 1) | blue;
+
+	ret = xavier_dev->write_dev(xavier_dev, 2, data,
+				    XAVIER_HEADER_CONTROL_ID);
+	if (ret < 0) {
+		ret = -EIO;
+
+		goto error;
+	}
+	xavier_dev->led_rgb = (red << 2) | (green << 1) | blue;
+	xavier_dev->error_code = 0;
+
+	return count;
+error:
+	return count;
+exit:
+	return ret;
+}
 
 static DEVICE_ATTR(cur_state, S_IWUSR | S_IRUSR, xavier_cur_state_show,
 		   xavier_cur_state_store);
@@ -965,6 +1211,10 @@ static DEVICE_ATTR(send_state, S_IWUSR | S_IRUSR, NULL,
 		   xavier_led_write);
 static DEVICE_ATTR(bright, S_IWUSR | S_IRUSR, xavier_bright_show,
 		   xavier_bright_store);
+static DEVICE_ATTR(led_red, S_IWUSR | S_IRUSR, xavier_led_red_show,
+		   xavier_led_red_store);
+static DEVICE_ATTR(led_rgb, S_IWUSR | S_IRUSR, xavier_led_rgb_show,
+		   xavier_led_rgb_store);
 
 static struct attribute *xavier_attrs[] = {
 	&dev_attr_cur_state.attr,
@@ -973,6 +1223,8 @@ static struct attribute *xavier_attrs[] = {
 	&dev_attr_available_state.attr,
 	&dev_attr_send_state.attr,
 	&dev_attr_bright.attr,
+	&dev_attr_led_red.attr,
+	&dev_attr_led_rgb.attr,
 	NULL
 };
 

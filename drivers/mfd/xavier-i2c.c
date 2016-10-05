@@ -35,7 +35,6 @@
 #include <linux/sysfs.h>
 #include <linux/uaccess.h>
 
-
 #define XAVIER_DEVICE_ID 0
 #define XAVIER_MESSAGE_SIZE_MASK 0x7C
 #define XAVIER_MESSAGE_TYPE_MASK 0x03
@@ -216,7 +215,12 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 
 		/* copy the data after the header*/
 		memcpy(&msg[1], cur_src, XAVIER_I2C_NB_DATA_BYTES);
-		ret += i2c_master_send(i2c, msg, XAVIER_I2C_NB_DATA_BYTES + 1);
+		ret = i2c_master_send(i2c, msg, XAVIER_I2C_NB_DATA_BYTES + 1);
+		if (ret < 0)
+		{
+			dev_err(xavier->dev, "message was not sent\n");
+			goto error_write;
+		}
 		dev_dbg(xavier->dev, "%s - data :\nXavier: %*ph\n",
 			__func__, XAVIER_I2C_NB_DATA_BYTES + 1, msg);
 		bytesleft = bytesleft - XAVIER_I2C_NB_DATA_BYTES;
@@ -234,11 +238,15 @@ static int xavier_i2c_write(struct xavier_dev *xavier, int bytes,
 
 	/* add the padding if necessary */
 	memset(&msg[bytesleft + 1], 0, XAVIER_I2C_NB_DATA_BYTES - bytesleft);
+	ret = i2c_master_send(i2c, msg, XAVIER_I2C_NB_DATA_BYTES + 1);
+	if (ret < 0)
+	{
+		dev_err(xavier->dev, "last message was not sent\n");
+		goto error_write;
+	}
 
-	ret += i2c_master_send(i2c, msg, XAVIER_I2C_NB_DATA_BYTES + 1);
-
+error_write:
 	mutex_unlock(&xavier->lock);
-
 error:
 	return ret;
 }
@@ -252,6 +260,7 @@ static irqreturn_t xavier_interrupt_handler(int irq, void *dev)
 		dev_err(xavier_dev->dev, "%s - NULL device found\n", __func__);
 		goto exit;
 	}
+
 
 	dev_dbg(xavier_dev->dev, "Interruption detected\n");
 
@@ -742,11 +751,9 @@ static void xavier_interrupt_work(struct work_struct *work)
 		/*type code are in MSB so we need to shift them */
 		if ((buf[0] >> XAVIER_CONTROL_TYPE_SHIFT) == XAVIER_CONTROL_ERROR_CODE) {
 
-
 			switch (buf[0] & XAVIER_CONTROL_ERROR_DATA_MASK) {
 
 			case NO_ERROR:
-
 				dev_dbg(xavier_dev->dev, "NO_ERROR received\n");
 
 				/* no error mean the host has reboot */
@@ -994,6 +1001,8 @@ static int xavier_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	xavier->reset_cause = 0;
 	xavier->bright = 31;
 	xavier->bright_dur = 0;
+	xavier->led_red = 0;
+	xavier->led_rgb = 0;
 	strcpy(xavier->version, " ");
 	strcpy(xavier->cur_state, " ");
 
