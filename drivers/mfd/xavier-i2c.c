@@ -261,7 +261,7 @@ static irqreturn_t xavier_interrupt_handler(int irq, void *dev)
 		goto exit;
 	}
 
-	dev_dgb(xavier_dev->dev, "Interruption detected\n");
+	dev_dbg(xavier_dev->dev, "Interruption detected\n");
 
 	/*Workqueue needed as write and read can't be done in irq context */
 	queue_work(xavier_dev->workqueue, &xavier_dev->interrupt_work);
