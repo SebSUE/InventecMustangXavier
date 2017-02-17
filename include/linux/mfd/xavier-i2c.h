@@ -45,6 +45,8 @@
 #define XAVIER_CONTROL_LED_RED 0x04
 #define XAVIER_CONTROL_LED_RGB 0x08
 
+#define XAVIER_NB_RGB_LED 4
+
 #define XAVIER_TYPE_MASK 0xE0
 #define XAVIER_CONTROL_ERROR_DATA_MASK 0x1F
 
@@ -91,8 +93,6 @@ struct xavier_dev {
 	int reset_cause;
 	int bright;
 	int bright_dur;
-	int led_red;
-	int led_rgb;
 	char version[XAVIER_VERSION_SIZE];
 	char cur_state[XAVIER_CUR_STATE_SIZE];
 };

@@ -987,134 +987,16 @@ exit:
 	return ret;
 }
 
-static ssize_t xavier_led_red_show(struct device *dev,
-				  struct device_attribute *attr, char *buf)
-{
-
-	int ret;
-	struct xavier_dev *xavier_dev;
-
-	xavier_dev = dev_get_drvdata(dev);
-	if (xavier_dev == NULL) {
-		ret = -EFAULT;
-		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
-		goto exit;
-	}
-
-	ret = sprintf(buf, "%d \n", xavier_dev->led_red);
-
-exit:
-	return ret;
-}
-
-
-static ssize_t xavier_led_red_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const  char *buf, size_t count)
-{
-
-	char data;
-	int ret;
-	int temp;
-
-	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
-
-	if (xavier_dev == NULL) {
-		ret = -EFAULT;
-		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
-		goto exit;
-	}
-
-	ret = kstrtoint(buf, 0, &temp);
-	if (ret) {
-		dev_err(xavier_dev->dev, "%s - Failed to transform data\n", __func__);
-		goto exit;
-	}
-
-	if (temp != 0 &&  temp != 1) {
-		ret = -EINVAL;
-		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
-		       __func__, temp);
-		goto exit;
-	}
-
-	data = XAVIER_CONTROL_LED_RED | (temp << (XAVIER_CONTROL_TYPE_SHIFT - 3));
-
-	xavier_dev->led_red = temp;
-	xavier_dev->error_code = 0;
-
-	/*write the new value to MCU to make it ready */
-	ret = xavier_dev->write_dev(xavier_dev, 1, &data, 0);
-	if (ret < 0) {
-		ret = -EIO;
-		dev_err(xavier_dev->dev, "%s - Failed to write to the device\n", __func__);
-		goto exit;
-	}
-	return count;
-exit:
-	return ret;
-}
-
-static ssize_t xavier_led_rgb_show(struct device *dev,
-				  struct device_attribute *attr, char *buf)
-{
-
-	int ret;
-	struct xavier_dev *xavier_dev;
-
-	xavier_dev = dev_get_drvdata(dev);
-	if (xavier_dev == NULL) {
-		ret = -EFAULT;
-		dev_err(xavier_dev->dev, "%s - NULL i2c device found\n", __func__);
-		goto exit;
-	}
-
-	switch (xavier_dev->led_rgb)
-	{
-		case 0:
-			ret = sprintf(buf, "0 0 0\n");
-		break;
-		case 1:
-			ret = sprintf(buf, "0 0 1\n");
-		break;
-		case 2:
-			ret = sprintf(buf, "0 1 0\n");
-		break;
-		case 3:
-			ret = sprintf(buf, "0 1 1\n");
-		break;
-		case 4:
-			ret = sprintf(buf, "1 0 0\n");
-		break;
-		case 5:
-			ret = sprintf(buf, "1 0 1\n");
-		break;
-		case 6:
-			ret = sprintf(buf, "1 1 0\n");
-		break;
-		case 7:
-			ret = sprintf(buf, "1 1 1\n");
-		break;
-		default:
-			ret = sprintf(buf, "0 0 0\n");
-		break;
-	}
-
-exit:
-	return ret;
-}
-
-
 static ssize_t xavier_led_rgb_store(struct device *dev,
 				   struct device_attribute *attr,
 				   const  char *buf, size_t count)
 {
 
-	char data[2];
+	char data[4];
 	char* msg;
 	int ret;
 	char* temp;
-	unsigned int red = 0, green = 0, blue = 0;
+	unsigned int idx = 0, red = 0, green = 0, blue = 0;
 
 	struct xavier_dev *xavier_dev = dev_get_drvdata(dev);
 
@@ -1138,16 +1020,26 @@ static ssize_t xavier_led_rgb_store(struct device *dev,
 		goto error;
 	}
 
-	ret = kstrtoint(temp, 0, &red);
+	ret = kstrtoint(temp, 0, &idx);
 	if (ret) {
+		dev_err(xavier_dev->dev, "%s - NULL token found (idx)\n", __func__);
+		goto error;
+	} else if (idx < 0 && idx > XAVIER_NB_RGB_LED) {
+		ret = -EINVAL;
+		dev_err(xavier_dev->dev, "%s - Wrong value must be between 0 and %d : found %d\n",
+			__func__, XAVIER_NB_RGB_LED, idx);
+		goto exit;
+	}
+
+	msg = xavier_new_token_data(msg, &red);
+	if (msg == NULL) {
+		ret = -EINVAL;
 		dev_err(xavier_dev->dev, "%s - NULL token found (red)\n", __func__);
 		goto error;
-	}
-	else if (red !=1 && red != 0)
-	{
+	} else if (red < 0 && red > 31) {
 		ret = -EINVAL;
-		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
-		       __func__, red);
+		dev_err(xavier_dev->dev, "%s - Wrong value must be between 0 and 31 : found %d\n",
+			__func__, red);
 		goto exit;
 	}
 
@@ -1156,12 +1048,10 @@ static ssize_t xavier_led_rgb_store(struct device *dev,
 		ret = -EINVAL;
 		dev_err(xavier_dev->dev, "%s - NULL token found (green)\n", __func__);
 		goto error;
-	}
-	else if (green !=1 && green != 0)
-	{
+	} else if (green < 0 && green > 31) {
 		ret = -EINVAL;
-		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
-		       __func__, green);
+		dev_err(xavier_dev->dev, "%s - Wrong value must be between 0 and 31 : found %d\n",
+			__func__, green);
 		goto exit;
 	}
 
@@ -1170,26 +1060,28 @@ static ssize_t xavier_led_rgb_store(struct device *dev,
 		ret = -EINVAL;
 		dev_err(xavier_dev->dev, "%s - NULL token found (blue)\n", __func__);
 		goto error;
-	}
-	else if (blue !=1 && blue != 0)
-	{
+	} else if (blue < 0 && blue > 31) {
 		ret = -EINVAL;
-		dev_err(xavier_dev->dev, "%s - Wrong value must be 1 or 0 : found %d\n",
-		       __func__, blue);
+		dev_err(xavier_dev->dev, "%s - Wrong value must be between 0 and 31 : found %d\n",
+			__func__, blue);
 		goto exit;
 	}
+
 	/*Send the formated command to the MCU */
 	data[0] = XAVIER_CONTROL_LED_RGB;
-	data[1] = (red << 2) | (green << 1) | blue;
+	data[1] = idx;
+	data[2] |= (red << 2);
+	data[2] |= (green >> 3);
+	data[3] |= (green << 5);
+	data[3] |= blue;
 
-	ret = xavier_dev->write_dev(xavier_dev, 2, data,
+	ret = xavier_dev->write_dev(xavier_dev, 4, data,
 				    XAVIER_HEADER_CONTROL_ID);
 	if (ret < 0) {
 		ret = -EIO;
 
 		goto error;
 	}
-	xavier_dev->led_rgb = (red << 2) | (green << 1) | blue;
 	xavier_dev->error_code = 0;
 
 	return count;
@@ -1211,9 +1103,7 @@ static DEVICE_ATTR(send_state, S_IWUSR | S_IRUSR, NULL,
 		   xavier_led_write);
 static DEVICE_ATTR(bright, S_IWUSR | S_IRUSR, xavier_bright_show,
 		   xavier_bright_store);
-static DEVICE_ATTR(led_red, S_IWUSR | S_IRUSR, xavier_led_red_show,
-		   xavier_led_red_store);
-static DEVICE_ATTR(led_rgb, S_IWUSR | S_IRUSR, xavier_led_rgb_show,
+static DEVICE_ATTR(led_rgb, S_IWUSR | S_IRUSR, NULL,
 		   xavier_led_rgb_store);
 
 static struct attribute *xavier_attrs[] = {
@@ -1223,7 +1113,6 @@ static struct attribute *xavier_attrs[] = {
 	&dev_attr_available_state.attr,
 	&dev_attr_send_state.attr,
 	&dev_attr_bright.attr,
-	&dev_attr_led_red.attr,
 	&dev_attr_led_rgb.attr,
 	NULL
 };

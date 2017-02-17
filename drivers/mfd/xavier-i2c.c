@@ -1000,8 +1000,7 @@ static int xavier_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	xavier->reset_cause = 0;
 	xavier->bright = 31;
 	xavier->bright_dur = 0;
-	xavier->led_red = 0;
-	xavier->led_rgb = 0;
+
 	strcpy(xavier->version, " ");
 	strcpy(xavier->cur_state, " ");
 
