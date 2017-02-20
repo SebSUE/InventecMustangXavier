@@ -281,37 +281,6 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 	}
 
 	xavier_dev->boot = 0;
-	/* Retriver the gpio for the first reset */
-	if (xavier_dev->reset_gpio == -1) {
-
-		ret = of_get_named_gpio(dev->of_node, "reset-gpio", 0);
-		if (ret < 0) {
-			dev_err(xavier_dev->dev, "%s - No gpio node found\n",
-			       __func__);
-			ret = -EINVAL;
-			goto error;
-		}
-
-		xavier_dev->reset_gpio = ret;
-
-		ret = gpio_request(xavier_dev->reset_gpio, "xavier_reset");
-		if (ret) {
-			dev_err(xavier_dev->dev, "%s - Failed to request gpio %d\n",
-			       __func__, xavier_dev->reset_gpio);
-			goto error;
-		}
-
-		ret = gpio_direction_output(xavier_dev->reset_gpio, 1);
-		if (ret) {
-			dev_err(xavier_dev->dev, "%s - Failed to set gpio direction\n",
-			       __func__);
-			goto error;
-		}
-
-		/*export the gpio into sysfs */
-		gpio_export(xavier_dev->reset_gpio, true);
-
-	}
 
 	/* Free irq to take control of the gpio */
 	free_irq(xavier_dev->irq, xavier_dev->dev);
@@ -337,11 +306,6 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 		__func__, gpio_get_value(xavier_dev->reset_gpio));
 
 
-	gpio_set_value(xavier_dev->reset_gpio, 1);
-	dev_dbg(xavier_dev->dev, "%s - gpio  value :%d\n",
-		__func__, gpio_get_value(xavier_dev->reset_gpio));
-
-
 	/* Flash need to retain control of the slave_int gpio until it's end */
 	if (!flash) {
 		/*release the GPIO for the MCU */
@@ -362,6 +326,10 @@ static int xavier_mcu_reset(struct device *dev, bool flash)
 		}
 	}
 
+	gpio_set_value(xavier_dev->reset_gpio, 1);
+	dev_dbg(xavier_dev->dev, "%s - gpio  value :%d\n",
+		__func__, gpio_get_value(xavier_dev->reset_gpio));
+
 error:
 	return ret;
 }
@@ -373,6 +341,8 @@ static int xavier_mcu_flash(struct device *dev)
 	int ret;
 	int size;
 	int nb_data_chunk;
+	int len;
+	int remaining_len;
 	loff_t pos;
 	char buffer[XAVIER_FIRMWARE_MESSAGE_SIZE];
 	struct file *firmfile;
@@ -426,6 +396,7 @@ static int xavier_mcu_flash(struct device *dev)
 		__func__, size, size, 4, buffer);
 
 	/* First message is the size of the firmware */
+	msleep(100);
 	ret = i2c_master_send(i2c, buffer, XAVIER_FIRMWARE_SIZE_SIZE);
 
 	if (ret < 0) {
@@ -439,15 +410,21 @@ static int xavier_mcu_flash(struct device *dev)
 	gpio_set_value(xavier_dev->slave_int, 1);
 
 
-	nb_data_chunk = size / XAVIER_FIRMWARE_MESSAGE_SIZE;
-
+	nb_data_chunk = (size / XAVIER_FIRMWARE_MESSAGE_SIZE) + 1;
+	remaining_len = size;
 	/* Send the firmware by chunk of 32 bytes */
 	pos = 0;
 	for (i = 0; i < nb_data_chunk; i++) {
 
+		if (remaining_len > XAVIER_FIRMWARE_MESSAGE_SIZE) {
+			len = XAVIER_FIRMWARE_MESSAGE_SIZE;
+		} else {
+			len = remaining_len;
+		}
+
 		set_fs(KERNEL_DS);
 		ret = vfs_read(firmfile, (char __user *)buffer,
-			       XAVIER_FIRMWARE_MESSAGE_SIZE, &pos);
+			       len, &pos);
 		if (ret < 0) {
 			dev_err(xavier_dev->dev, "%s - Failed to read the file\n",
 			       __func__);
@@ -457,9 +434,9 @@ static int xavier_mcu_flash(struct device *dev)
 
 		set_fs(old_fs);
 		dev_dbg(xavier_dev->dev, "%s - Read file : %*ph\n",
-			__func__, XAVIER_FIRMWARE_MESSAGE_SIZE, buffer);
+			__func__, len, buffer);
 
-		ret = i2c_master_send(i2c, buffer, XAVIER_FIRMWARE_MESSAGE_SIZE);
+		ret = i2c_master_send(i2c, buffer, len);
 		if (ret < 0) {
 			dev_err(xavier_dev->dev, "%s - Failed to send to device ret = %d\n",
 			       __func__, ret);
@@ -484,6 +461,7 @@ static int xavier_mcu_flash(struct device *dev)
 		dev_dbg(xavier_dev->dev, "ACK received : %c\n",
 			buffer[0]);
 
+		remaining_len -= len;
 	}
 
 exit:
@@ -960,14 +938,38 @@ static int xavier_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 
 	gpio_export(gpio, true);
 
+	ret = of_get_named_gpio(i2c->dev.of_node, "reset-gpio", 0);
+	if (ret < 0) {
+		dev_err(&i2c->dev, "%s - No gpio node found\n",
+		       __func__);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	xavier->reset_gpio = ret;
+
+	ret = gpio_request(xavier->reset_gpio, "xavier_reset");
+	if (ret) {
+		dev_err(&i2c->dev, "%s - Failed to request gpio %d\n",
+		       __func__, xavier->reset_gpio);
+		goto error;
+	}
+
+	ret = gpio_direction_output(xavier->reset_gpio, 1);
+	if (ret) {
+		dev_err(&i2c->dev, "%s - Failed to set gpio direction\n",
+		       __func__);
+		goto error;
+	}
+
+	/*export the gpio into sysfs */
+	gpio_export(xavier->reset_gpio, true);
 	i2c->addr = XAVIER_SLAVE_ADDRESS;
 
 	xavier->dev = &i2c->dev;
 	xavier->i2c = i2c;
 	xavier->irq = i2c->irq;
 
-	/*request the gpio cause a reset so we wait a reset to request it */
-	xavier->reset_gpio = -1;
 	xavier->read_dev = xavier_i2c_read;
 	xavier->write_dev = xavier_i2c_write;
 
@@ -1000,8 +1002,7 @@ static int xavier_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	xavier->reset_cause = 0;
 	xavier->bright = 31;
 	xavier->bright_dur = 0;
-	xavier->led_red = 0;
-	xavier->led_rgb = 0;
+
 	strcpy(xavier->version, " ");
 	strcpy(xavier->cur_state, " ");
 

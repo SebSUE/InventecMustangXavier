@@ -37,6 +37,8 @@
 #define XAVIER_TOUCH_ID_EVENT_MASK 0xE0 /* 3 first MSB bits */
 #define XAVIER_TOUCH_BTN0_EVENT_MASK 0x10 /* 1 bit after id event */
 #define XAVIER_TOUCH_BTN1_EVENT_MASK 0x08 /* 1 bit after BTN_0 event */
+#define XAVIER_TOUCH_BTN2_EVENT_MASK 0x04 /* 1 bit after BTN_1 event */
+#define XAVIER_TOUCH_BTN3_EVENT_MASK 0x02 /* 1 bit after BTN_2 event */
 #define XAVIER_TOUCH_LOCATION_EVENT_MSB_MASK 0x1F
 #define XAVIER_TOUCH_LOCATION_EVENT_LSB_MASK 0xC0 /* 7 bits after id event */
 #define XAVIER_TOUCH_ORIENTATION_EVENT_MASK 0x20 /* 1 bit after location */
@@ -47,6 +49,8 @@
 #define XAVIER_TOUCH_EVENT_SHIFT 5
 #define XAVIER_TOUCH_BTN0_EVENT_SHIFT 4
 #define XAVIER_TOUCH_BTN1_EVENT_SHIFT 3
+#define XAVIER_TOUCH_BTN2_EVENT_SHIFT 2
+#define XAVIER_TOUCH_BTN3_EVENT_SHIFT 1
 #define XAVIER_TOUCH_LOCATION_EVENT_MSB_SHIFT  2
 #define XAVIER_TOUCH_LOCATION_EVENT_LSB_SHIFT  6
 #define XAVIER_TOUCH_VELOCITY_EVENT_MSB_SHIFT  2
@@ -62,6 +66,8 @@
 
 #define XAVIER_TOUCH_BTN0 BTN_1
 #define XAVIER_TOUCH_BTN1 BTN_2
+#define XAVIER_TOUCH_BTN2 BTN_3
+#define XAVIER_TOUCH_BTN3 BTN_4
 #define XAVIER_TOUCH_BTNWHEEL BTN_WHEEL
 #define XAVIER_TOUCH_WHEEL ABS_WHEEL
 #define XAVIER_TOUCH_ORIENTATION ABS_MT_ORIENTATION
@@ -78,12 +84,16 @@ struct xavier_touch {
 
 	int btn0;
 	int btn1;
+	int btn2;
+	int btn3;
 	int btn_wheel;
 	int abs_wheel;
 	int direction;
 	int velocity;
 	char btn_0;
 	char btn_1;
+	char btn_2;
+	char btn_3;
 };
 
 static int input_handler(struct platform_device *touch_dev,
@@ -91,7 +101,7 @@ static int input_handler(struct platform_device *touch_dev,
 {
 
 	struct xavier_touch *xavier_touch;
-	char event, btn0_value, btn1_value;
+	char event, btn0_value, btn1_value, btn2_value, btn3_value;
 	char location, orientation, velocity, error;
 	int ret;
 
@@ -120,6 +130,10 @@ static int input_handler(struct platform_device *touch_dev,
 			      XAVIER_TOUCH_BTN0_EVENT_SHIFT);
 		btn1_value = ((data[0] & XAVIER_TOUCH_BTN1_EVENT_MASK) >>
 			      XAVIER_TOUCH_BTN1_EVENT_SHIFT);
+		btn2_value = ((data[0] & XAVIER_TOUCH_BTN2_EVENT_MASK) >>
+			      XAVIER_TOUCH_BTN2_EVENT_SHIFT);
+		btn3_value = ((data[0] & XAVIER_TOUCH_BTN3_EVENT_MASK) >>
+			      XAVIER_TOUCH_BTN3_EVENT_SHIFT);
 
 		if (xavier_touch->btn_0 != btn0_value) {
 			dev_dbg(xavier_touch->dev, "BTN_TOUCH_0 event\n");
@@ -133,6 +147,20 @@ static int input_handler(struct platform_device *touch_dev,
 			xavier_touch->btn_1 = btn1_value;
 			input_report_key(xavier_touch->input_dev,
 					 xavier_touch->btn1, btn1_value);
+		}
+
+		if (xavier_touch->btn_2 != btn2_value) {
+			dev_dbg(xavier_touch->dev, "BTN_TOUCH_2 event\n");
+			xavier_touch->btn_2 = btn2_value;
+			input_report_key(xavier_touch->input_dev,
+					 xavier_touch->btn2, btn2_value);
+		}
+
+		if (xavier_touch->btn_3 != btn3_value) {
+			dev_dbg(xavier_touch->dev, "BTN_TOUCH_3 event\n");
+			xavier_touch->btn_3 = btn3_value;
+			input_report_key(xavier_touch->input_dev,
+					 xavier_touch->btn3, btn3_value);
 		}
 
 		break;
@@ -318,6 +346,8 @@ static int xavier_touch_probe(struct platform_device *pdev)
 	xavier_touch->dev = &pdev->dev;
 	xavier_touch->btn_0 = 0;
 	xavier_touch->btn_1 = 0;
+	xavier_touch->btn_2 = 0;
+	xavier_touch->btn_3 = 0;
 
 	xavier_dev->touch_dev = pdev;
 	xavier_dev->input_handler = input_handler;
@@ -345,6 +375,24 @@ static int xavier_touch_probe(struct platform_device *pdev)
 				 &xavier_touch->btn1)) {
 
 		dev_err(xavier_dev->dev, "%s - Failed to found btn1 node\n",
+		       __func__);
+		ret = -EFAULT;
+		goto error_free_device;
+	}
+
+	if (of_property_read_u32(xavier_dev->dev->of_node, "btn2",
+				 &xavier_touch->btn2)) {
+
+		dev_err(xavier_dev->dev, "%s - Failed to found btn2 node\n",
+		       __func__);
+		ret = -EFAULT;
+		goto error_free_device;
+	}
+
+	if (of_property_read_u32(xavier_dev->dev->of_node, "btn3",
+				 &xavier_touch->btn3)) {
+
+		dev_err(xavier_dev->dev, "%s - Failed to found btn3 node\n",
 		       __func__);
 		ret = -EFAULT;
 		goto error_free_device;
@@ -390,6 +438,8 @@ static int xavier_touch_probe(struct platform_device *pdev)
 	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 	input_dev->keybit[BIT_WORD(xavier_touch->btn0)] |= BIT_MASK(xavier_touch->btn0);
 	input_dev->keybit[BIT_WORD(xavier_touch->btn1)] |= BIT_MASK(xavier_touch->btn1);
+	input_dev->keybit[BIT_WORD(xavier_touch->btn2)] |= BIT_MASK(xavier_touch->btn2);
+	input_dev->keybit[BIT_WORD(xavier_touch->btn3)] |= BIT_MASK(xavier_touch->btn3);
 
 	input_dev->keybit[BIT_WORD(xavier_touch->btn_wheel)] |= BIT_MASK(xavier_touch->btn_wheel);
 

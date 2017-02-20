@@ -126,19 +126,6 @@
 			nxp,statecodes = <0x00000000>;
 			reg = <0x66>;
 		};
-		xavier: xavier@68 {
-			reg = <0x68>;
-			compatible = "xavier";
-			gpio = <&gpio_ccm 8 1>;
-			reset-gpio = <&gpio_ccm 9 0>;
-			btn0 = <0x100>;
-			btn1 = <0x101>;
-			btn_wheel = <0x150>;
-			abs_wheel = <0x08>;
-			direction = <0x34>;
-			velocity = <0x28>;
-			status = "okay";
-		};
 	};
 
 &i2c1 {
@@ -199,6 +186,22 @@
 			>;
 		status = "okay";
 
+	};
+
+	xavier: xavier@68 {
+		reg = <0x68>;
+		compatible = "xavier";
+		gpio = <&gpio_ccm 10 1>;
+		reset-gpio = <&gpio_ccm 9 0>;
+		btn0 = <0x100>;
+		btn1 = <0x101>;
+		btn2 = <0x102>;
+		btn3 = <0x103>;
+		btn_wheel = <0x150>;
+		abs_wheel = <0x08>;
+		direction = <0x34>;
+		velocity = <0x28>;
+		status = "okay";
 	};
 };
 
